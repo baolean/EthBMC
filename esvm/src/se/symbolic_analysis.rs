@@ -491,6 +491,31 @@ impl Analysis {
                 }
             }
         }
+        if let Some(HaltingReason::Revert) = potential_attack_state.halting_reason {
+            if potential_attack_state.account().assert_fail &&
+                    potential_attack_state.check_sat() {
+
+                println!("That is an assert failure!");
+            
+                if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
+                    if self
+                        .verify_tx_assert(&potential_attack_state, &data)
+                        .is_some()
+                    {
+                    let attack = Attack {
+                        txs: data,
+                        attack_type: AttackType::AssertFailed,
+                        };
+                        result.lock().unwrap().push(attack);
+                    }
+                } else {
+                    debug!(
+                        "Found attack, {}, but could not generate tx data!",
+                        AttackType::AssertFailed
+                    );
+                }
+            }
+        }
         // check if we can suicide the contract
         if let Some(HaltingReason::Selfdestruct) = potential_attack_state.halting_reason {
             if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
@@ -661,6 +686,24 @@ impl Analysis {
                     return None;
                 }
             };
+        }
+        None
+    }
+
+    fn verify_tx_assert(&self, state: &SeState, attack_data: &[TxData]) -> Option<()> {
+        if state.context.config().no_verify {
+            return Some(());
+        }
+
+        let evm = self.execute_concrete_evm(state, attack_data)?;
+
+        for ins in evm.result.ok()?.trace {
+            if let Instruction::Revert { panic, .. } = ins.instruction {
+                info!("the panic code is {:?}", panic);
+                if panic == WU256::from(U256::from(0x01)) {
+                    return Some(());
+                }
+            }
         }
         None
     }
@@ -877,6 +920,7 @@ pub enum AttackType {
     HijackControlFlow,
     Reentrancy,
     CanChangeOwner,
+    AssertFailed,
 }
 
 impl fmt::Display for AttackType {
@@ -891,6 +935,7 @@ impl fmt::Display for AttackType {
             }
             AttackType::Reentrancy => write!(f, "can trigger reentrancy"),
             AttackType::CanChangeOwner => write!(f, "can change owner variable as attacker"),
+            AttackType::AssertFailed => write!(f, "assertion can fail"),
         }
     }
 }

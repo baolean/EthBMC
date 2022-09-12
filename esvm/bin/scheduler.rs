@@ -356,7 +356,7 @@ fn execute(
                 };
                 if json {
                     if let AnalysisSuccess::Success(ref analysis) = r {
-                            let mut res = (false, false, false);
+                            let mut res = (false, false, false, false);
                             if let Some(ref attacks) = analysis.attacks {
                                 for attack in attacks {
                                     if attack.attack_type == AttackType::StealMoney {
@@ -368,16 +368,19 @@ fn execute(
                                     if attack.attack_type == AttackType::HijackControlFlow {
                                         res.2 = true;
                                     }
+                                    if attack.attack_type == AttackType::AssertFailed {
+                                        res.3 = true;
+                                    }
                                 }
                             }
-                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2).as_bytes()).expect("Could not write to csv file!");
+                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2, res.3).as_bytes()).expect("Could not write to csv file!");
 
                     }
                     let _write_res = f.write_all(json!(r).to_string().as_bytes());
                 } else {
                     let content = match r {
                         AnalysisSuccess::Success(analysis) => {
-                            let mut res = (false, false, false);
+                            let mut res = (false, false, false, false);
                             if let Some(ref attacks) = analysis.attacks {
                                 for attack in attacks {
                                     if attack.attack_type == AttackType::StealMoney {
@@ -389,9 +392,12 @@ fn execute(
                                     if attack.attack_type == AttackType::HijackControlFlow {
                                         res.2 = true;
                                     }
+                                    if attack.attack_type == AttackType::AssertFailed {
+                                        res.3 = true;
+                                    }
                                 }
                             }
-                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2).as_bytes()).expect("Could not write to csv file!");
+                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2, res.3).as_bytes()).expect("Could not write to csv file!");
 
                             format!("{}", analysis)
                         },

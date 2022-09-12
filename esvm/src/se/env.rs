@@ -956,6 +956,7 @@ pub struct Account {
     pub storage: MVal,
     pub mappings: Arc<HashMap<BVal, MVal>>,
     pub selfdestruct: bool,
+    pub assert_fail: bool,
     pub owner: Option<BVal>, // index for owner variable
     pub initial_storage: Option<Vec<(WU256, WU256)>>,
     pub initial_balance: Option<WU256>,
@@ -979,6 +980,7 @@ impl Account {
         );
         let constraints = vec![];
         let selfdestruct = false;
+        let assert_fail = false;
         let codesize = match code.clone() {
             Some(v) => v.len(),
             None => 0,
@@ -997,6 +999,7 @@ impl Account {
             storage,
             constraints,
             selfdestruct,
+            assert_fail,
             code,
             codesize,
             owner,

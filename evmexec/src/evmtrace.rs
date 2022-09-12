@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use uint::U256;
 
 use regex::Regex;
 
@@ -122,6 +123,15 @@ fn parse_trace_line_with_depth(line: &str) -> Option<ParsedTraceLine> {
                 let receiver = stack.pop().unwrap();
                 Some(Instruction::Selfdestruct { receiver })
             }
+            0xfd => {
+                let memory = &cap["memory"];
+                if memory.contains("0x4e487b710000000000000000000000000000000000000000000000000000000000000001") {
+                    let assert_code: U256 = 0x01.into();
+                    Some(Instruction::Revert { panic: WU256(assert_code) })
+                } else {
+                    None
+                }
+            }
             _ => None,
         }?;
         let depth = cap["depth"].parse::<u16>().ok()?;
@@ -229,6 +239,9 @@ pub enum Instruction {
     },
     Selfdestruct {
         receiver: WU256,
+    },
+    Revert {
+        panic: WU256,
     },
 }
 
