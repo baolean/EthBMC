@@ -25,6 +25,7 @@ pub struct Config {
     pub istanbul_block: u32,
     pub london_block: u32,
     pub berlin_block: u32,
+    pub chain_id: u32,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -97,6 +98,7 @@ impl Config {
         let istanbul_block = 0;
         let berlin_block = 0;
         let london_block = 0;
+        let chain_id: u32 = 1;
 
         Self {
             eip150_block,
@@ -110,6 +112,7 @@ impl Config {
             istanbul_block,
             berlin_block,
             london_block,
+            chain_id,
         }
     }
 }

@@ -79,6 +79,7 @@ pub fn symbolic_step(s: &SeState) -> Vec<(SeState, EdgeType)> {
         Instr::INumber => arith0(s, Some(&s.env.latest_block().number)),
         Instr::IDifficulty => arith0(s, Some(&s.env.latest_block().difficulty)),
         Instr::IGasLimit => arith0(s, Some(&s.env.latest_block().gas_limit)),
+        Instr::IChainId => arith0(s, Some(&s.env.latest_block().chainid)),
         Instr::IPop => pop_n(s, 1),
         Instr::IMLoad => memload(s),
         Instr::IMStore => mstore(s),

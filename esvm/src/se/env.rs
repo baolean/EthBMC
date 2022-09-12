@@ -269,6 +269,7 @@ pub struct Block {
     pub timestamp: BVal,
     pub coinbase: BVal,
     pub blockhash: BVal,
+    pub chainid: BVal,
 
     /// If this is a real block and not one we created, this is set
     pub blocknumber: Option<usize>,
@@ -286,6 +287,8 @@ impl Block {
         let coinbase = fresh_var("coinbase");
         let blockhash = fresh_var("blockhash");
         let blocknumber = None;
+        let chainid = fresh_var("chainid");
+
         Self {
             gasprice,
             mem_size,
@@ -296,6 +299,7 @@ impl Block {
             coinbase,
             blockhash,
             blocknumber,
+            chainid,
         }
     }
 }

@@ -183,6 +183,9 @@ impl Disasm {
             0x43 => Instr::INumber,
             0x44 => Instr::IDifficulty,
             0x45 => Instr::IGasLimit,
+            0x46 => Instr::IChainId,
+            // 0x47 => Instr::ISelfBalance,
+            // 0x48 => Instr::IBaseFee,
             //...
             0x50 => Instr::IPop,
             0x51 => Instr::IMLoad,
