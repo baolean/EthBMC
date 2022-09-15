@@ -351,13 +351,12 @@ contract Vat {
         address me = msg.sender; // address(this);
         slip("gems", me, 8*10**27);
 
-        // // Exploit
+        // Exploit
         frob("gems", me, me, me, 8, 4);
         fold("gems", me, -10**27);
         init("gems");
 
         // assert(debt == (vice + Art("gems") * rate("gems")));
-        // assert(false);
     }
 
     function _assert() external {
