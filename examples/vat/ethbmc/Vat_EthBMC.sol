@@ -338,6 +338,7 @@ contract Vat {
         emit Fold(i, u, rate_);
     }
 
+    // --- FEoD Violation --- 
     function fail() external {
         // Constructor:
         live = 1;
@@ -348,7 +349,7 @@ contract Vat {
         file("gems", "spot", 0.5*10**27); // ray(0.5  ether));
         file("gems", "line", 1000*10**27); // rad(1000 ether));
         file("Line",         1000*10**27); // rad(1000 ether));
-        address me = msg.sender; // address(this);
+        address me = msg.sender;
         slip("gems", me, 8*10**27);
 
         // Exploit
