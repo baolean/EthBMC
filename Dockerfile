@@ -21,6 +21,8 @@ RUN git clone https://github.com/boolector/boolector \
   && ./contrib/setup-btor2tools.sh \
   && ./configure.sh && cd build && make
 
+ENV PATH="${PATH}:/boolector/build/bin"
+
 # (3) z3: takes ~40 minutes to install
 # RUN \
 #    mkdir -p temp && cd /temp &&\
