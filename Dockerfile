@@ -55,6 +55,7 @@ WORKDIR /app
 # Install EthBMC
 RUN git clone https://github.com/baolean/EthBMC.git \
   && cd EthBMC \
-  && cargo build --release
+  && cargo build --release \
+  && mkdir queries
 
 ENTRYPOINT ["/bin/bash", "EthBMC/start.sh"]
