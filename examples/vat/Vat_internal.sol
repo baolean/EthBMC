@@ -111,32 +111,32 @@ contract Vat {
     }
 
     // --- Administration ---
-    function rely(address usr) external auth {
+    function rely(address usr) internal auth {
         require(live == 1, "Vat/not-live");
         wards[usr] = 1;
         emit Rely(usr);
     }
 
-    function deny(address usr) external auth {
+    function deny(address usr) internal auth {
         require(live == 1, "Vat/not-live");
         wards[usr] = 0;
         emit Deny(usr);
     }
 
-    function init(bytes32 ilk) public auth { // external
+    function init(bytes32 ilk) internal auth { // external
         require(ilks[ilk].rate == 0, "Vat/ilk-already-init");
         ilks[ilk].rate = 10 ** 27;
         emit Init(ilk);
     }
 
-    function file(bytes32 what, uint256 data) public auth { // external
+    function file(bytes32 what, uint256 data) internal auth { // external
         require(live == 1, "Vat/not-live");
         if (what == "Line") Line = data;
         else revert("Vat/file-unrecognized-param");
         emit File(what, data);
     }
 
-    function file(bytes32 ilk, bytes32 what, uint256 data) public auth { // external
+    function file(bytes32 ilk, bytes32 what, uint256 data) internal auth { // external
         require(live == 1, "Vat/not-live");
         if (what == "spot") ilks[ilk].spot = data;
         else if (what == "line") ilks[ilk].line = data;
@@ -145,65 +145,65 @@ contract Vat {
         emit File(ilk, what, data);
     }
 
-    function cage() external auth {
+    function cage() internal auth {
         live = 0;
         emit Cage();
     }
 
     // --- Structs getters ---
-    function Art(bytes32 ilk) public view returns (uint256 Art_) { // external
+    function Art(bytes32 ilk) internal view returns (uint256 Art_) { // external
         Art_ = ilks[ilk].Art;
     }
 
-    function rate(bytes32 ilk) public view returns (uint256 rate_) { // external
+    function rate(bytes32 ilk) internal view returns (uint256 rate_) { // external
         rate_ = ilks[ilk].rate;
     }
 
-    function spot(bytes32 ilk) external view returns (uint256 spot_) {
+    function spot(bytes32 ilk) internal view returns (uint256 spot_) {
         spot_ = ilks[ilk].spot;
     }
 
-    function line(bytes32 ilk) external view returns (uint256 line_) {
+    function line(bytes32 ilk) internal view returns (uint256 line_) {
         line_ = ilks[ilk].line;
     }
 
-    function dust(bytes32 ilk) external view returns (uint256 dust_) {
+    function dust(bytes32 ilk) internal view returns (uint256 dust_) {
         dust_ = ilks[ilk].dust;
     }
 
-    function ink(bytes32 ilk, address urn) external view returns (uint256 ink_) {
+    function ink(bytes32 ilk, address urn) internal view returns (uint256 ink_) {
         ink_ = urns[ilk][urn].ink;
     }
 
-    function art(bytes32 ilk, address urn) external view returns (uint256 art_) {
+    function art(bytes32 ilk, address urn) internal view returns (uint256 art_) {
         art_ = urns[ilk][urn].art;
     }
 
     // --- Allowance ---
-    function hope(address usr) external {
+    function hope(address usr) internal {
         can[msg.sender][usr] = 1;
         emit Hope(msg.sender, usr);
     }
 
-    function nope(address usr) external {
+    function nope(address usr) internal {
         can[msg.sender][usr] = 0;
         emit Nope(msg.sender, usr);
     }
 
     // --- Fungibility ---
-    function slip(bytes32 ilk, address usr, int256 wad) public auth { // external
+    function slip(bytes32 ilk, address usr, int256 wad) internal auth { // external
         gem[ilk][usr] = _add(gem[ilk][usr], wad);
         emit Slip(ilk, usr, wad);
     }
 
-    function flux(bytes32 ilk, address src, address dst, uint256 wad) external {
+    function flux(bytes32 ilk, address src, address dst, uint256 wad) internal {
         require(wish(src, msg.sender), "Vat/not-allowed");
         gem[ilk][src] = gem[ilk][src] - wad;
         gem[ilk][dst] = gem[ilk][dst] + wad;
         emit Flux(ilk, src, dst, wad);
     }
 
-    function move(address src, address dst, uint256 rad) external {
+    function move(address src, address dst, uint256 rad) internal {
         require(wish(src, msg.sender), "Vat/not-allowed");
         dai[src] = dai[src] - rad;
         dai[dst] = dai[dst] + rad;
@@ -219,12 +219,13 @@ contract Vat {
     }
 
     // --- CDP Manipulation ---
-    function frob(bytes32 i, address u, address v, address w, int256 dink, int256 dart) public { // external
+    function frob(bytes32 i, address u, address v, address w, int256 dink, int256 dart) internal { // external
         // system is live
         require(live == 1, "Vat/not-live");
 
         Urn memory urn = urns[i][u];
         Ilk memory ilk = ilks[i];
+
         // ilk has been initialised
         require(ilk.rate != 0, "Vat/ilk-not-init");
 
@@ -261,7 +262,7 @@ contract Vat {
     }
 
     // --- CDP Fungibility ---
-    function fork(bytes32 ilk, address src, address dst, int256 dink, int256 dart) external {
+    function fork(bytes32 ilk, address src, address dst, int256 dink, int256 dart) internal {
         Urn storage u = urns[ilk][src];
         Urn storage v = urns[ilk][dst];
         Ilk storage i = ilks[ilk];
@@ -289,7 +290,7 @@ contract Vat {
     }
 
     // --- CDP Confiscation ---
-    function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) external auth {
+    function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) internal auth {
         Urn storage urn = urns[i][u];
         Ilk storage ilk = ilks[i];
 
@@ -307,7 +308,7 @@ contract Vat {
     }
 
     // --- Settlement ---
-    function heal(uint256 rad) external {
+    function heal(uint256 rad) internal { // external 
         address u = msg.sender;
         sin[u] = sin[u] - rad;
         dai[u] = dai[u] - rad;
@@ -317,7 +318,7 @@ contract Vat {
         emit Heal(msg.sender, rad);
     }
 
-    function suck(address u, address v, uint256 rad) external auth {
+    function suck(address u, address v, uint256 rad) internal auth { // external
         sin[u] = sin[u] + rad;
         dai[v] = dai[v] + rad;
         vice   = vice   + rad;
@@ -327,7 +328,7 @@ contract Vat {
     }
 
     // --- Rates ---
-    function fold(bytes32 i, address u, int256 rate_) public auth { // external
+    function fold(bytes32 i, address u, int256 rate_) internal auth { // external
         require(live == 1, "Vat/not-live");
         Ilk storage ilk = ilks[i];
         ilk.rate    = _add(ilk.rate, rate_);
@@ -338,12 +339,7 @@ contract Vat {
         emit Fold(i, u, rate_);
     }
 
-    // --- FEoD Violation --- 
-    function fail() external {
-        // Constructor:
-        live = 1;
-        wards[msg.sender] = 1;
-        
+    function fail() external {        
         // Setup
         init("gems");
         file("gems", "spot", 0.5*10**27); // ray(0.5  ether));

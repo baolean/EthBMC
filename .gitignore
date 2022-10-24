@@ -13,6 +13,8 @@ Cargo.lock
 
 *.txt
 
+*.DS_Store
+
 /log/
 
 .DS_store
