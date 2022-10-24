@@ -338,11 +338,12 @@ contract Vat {
         emit Fold(i, u, rate_);
     }
 
-    function fail() external {
+    // --- FEoD Violation --- 
+    function fail() external {      
         // Constructor:
         live = 1;
         wards[msg.sender] = 1;
-        
+  
         // Setup
         init("gems");
         file("gems", "spot", 0.5*10**27); // ray(0.5  ether));
