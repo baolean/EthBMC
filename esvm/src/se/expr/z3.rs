@@ -241,7 +241,7 @@ impl Z3Instance {
         if res.contains("unknown") {
             if self.warnings {
                 // timeout is specified in miliseconds
-                warn!("Solver timed out after {} seconds.", self.timeout / 1_000);
+                println!("Solver timed out after {} seconds.", self.timeout / 1_000);
                 debug!("{}", self.debug_ouput());
             }
             return false;

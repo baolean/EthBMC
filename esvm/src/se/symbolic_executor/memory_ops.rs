@@ -374,12 +374,20 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
         res.halting_reason = Some(HaltingReason::Revert);
         res.revert_state_changes();
 
-        let loaded_returndata = FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();    
-        let code = FVal::as_bigint(&mload8(&s.memory, s.mem, &add(&addr, &const_usize(35)))).unwrap_or_default();
+        let loaded_returndata =
+            FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();
+        let code = FVal::as_bigint(&mload8(&s.memory, s.mem, &add(&addr, &const_usize(35))))
+            .unwrap_or_default();
         let one = FVal::as_bigint(&const_usize(1)).unwrap_or_default();
 
-        if loaded_returndata == U256::from_dec_str("35408467139433450592217433187231851964531694900788300625387963629091585785856").unwrap() &&
-            code == one {
+        // Detecting failed asserts in solc >= 0.8 based on returndata
+        if loaded_returndata
+            == U256::from_dec_str(
+                "35408467139433450592217433187231851964531694900788300625387963629091585785856",
+            )
+            .unwrap()
+            && code == one
+        {
             res.account_mut().assert_fail = true
         }
 

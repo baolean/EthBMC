@@ -302,7 +302,8 @@ impl SymbolicGraph {
             loop {
                 if let Some(next_state) = unprocessed_states.pop() {
                     counter += 1;
-                    if counter >= 20_000_000 { // increased from 20_000
+                    if counter >= 20_000_000 {
+                        // increased from 20_000
                         break;
                     }
                     // send expansive transtions to worker threads, this blocks when all worker threads

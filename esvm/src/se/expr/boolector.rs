@@ -64,7 +64,7 @@ impl BoolectorInstance {
         } else if output.contains("sat") {
             true
         } else if output.contains("unknown") {
-            warn!("Solver timed out after {} seconds", self.timeout);
+            println!("Solver timed out after {} seconds", self.timeout);
             false
         } else {
             debug!(

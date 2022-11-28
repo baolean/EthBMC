@@ -218,7 +218,7 @@ pub enum AnalysisMode {
 }
 
 impl AnalysisMode {
-    fn is_exeution(&self) -> bool {
+    fn is_execution(&self) -> bool {
         if let AnalysisMode::Execution = self {
             true
         } else {
@@ -339,7 +339,7 @@ impl Analysis {
     }
 
     pub fn symbolic_round(&mut self) {
-        assert!(self.mode.is_exeution());
+        assert!(self.mode.is_execution());
         self.graph.analyze_graph();
 
         self.end_states = Some(self.graph.end_states());
@@ -348,7 +348,7 @@ impl Analysis {
     pub fn exploration_result(mut self) -> ExplorationResult {
         assert!(self.end_states.is_some());
         let end_states = self.end_states.take().unwrap();
-        info!(
+        println!(
             "Found {} potential attack states, analyzing...",
             end_states.len()
         );
@@ -483,7 +483,7 @@ impl Analysis {
                             result.lock().unwrap().push(attack);
                         }
                     } else {
-                        debug!(
+                        println!(
                             "Found attack, {}, but could not generate tx data!",
                             AttackType::CanChangeOwner
                         );
@@ -492,24 +492,22 @@ impl Analysis {
             }
         }
         if let Some(HaltingReason::Revert) = potential_attack_state.halting_reason {
-            if potential_attack_state.account().assert_fail &&
-                    potential_attack_state.check_sat() {
-
+            if potential_attack_state.account().assert_fail && potential_attack_state.check_sat() {
                 println!("That is an assert failure!");
-            
+
                 if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
                     if self
                         .verify_tx_assert(&potential_attack_state, &data)
                         .is_some()
                     {
-                    let attack = Attack {
-                        txs: data,
-                        attack_type: AttackType::AssertFailed,
+                        let attack = Attack {
+                            txs: data,
+                            attack_type: AttackType::AssertFailed,
                         };
                         result.lock().unwrap().push(attack);
                     }
                 } else {
-                    debug!(
+                    println!(
                         "Found attack, {}, but could not generate tx data!",
                         AttackType::AssertFailed
                     );
@@ -613,7 +611,32 @@ impl Analysis {
                 *victim,
                 *initial_tx,
             ),
-            None => SeState::new(Arc::clone(&context), memory, &env, *victim, *initial_tx),
+            None => {
+                let mut new_state =
+                    SeState::new(Arc::clone(&context), memory, &env, *victim, *initial_tx);
+
+                // Restricting the analysis to "prove_xxx" functions
+                // Loading the calldata from memory
+                let load = mload(&new_state.memory, new_state.input_tx().data, &const256("0"));
+
+                if let Some(selectors) = env.get_selectors() {
+                    let mut constraints: Vec<Arc<FVal>> = vec![];
+                    for s in selectors.iter() {
+                        let prove_selector = const_vec(&hexdecode::decode(s.as_bytes()).unwrap());
+                        // Selecting the first 4 bytes from the calldata
+                        let shiftval = const_u256(U256::from(224));
+                        let shiftop = lshr(&load, &shiftval);
+                        let prove_constraint = eql(&prove_selector, &shiftop);
+                        constraints.push(prove_constraint);
+                    }
+                    // The calldata's selector should be pointing to either of the "prove_xxx" functions
+                    let constraint = constraints
+                        .iter()
+                        .fold(const_u256(U256::from(0)), |acc, x| or(&acc, &x));
+                    new_state.push_constraint(constraint);
+                }
+                new_state
+            }
         };
         SymbolicGraph::new(state)
     }
@@ -696,10 +719,9 @@ impl Analysis {
         }
 
         let evm = self.execute_concrete_evm(state, attack_data)?;
-
         for ins in evm.result.ok()?.trace {
+            // Detecting assert violations in solc >= 0.8
             if let Instruction::Revert { panic, .. } = ins.instruction {
-                info!("the panic code is {:?}", panic);
                 if panic == WU256::from(U256::from(0x01)) {
                     return Some(());
                 }

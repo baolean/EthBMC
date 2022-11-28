@@ -171,7 +171,7 @@ pub type ReadTracker = Arc<HashMap<MVal, HashSet<BVal>>>;
 
 impl Debug for SeState {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(f, "State{{\n\tid: {}\n\tpc: {} ({:?})\n\tstack: {:?}\n\tconstrainst: {:?}\n\tmemory: {}\n\tstorage: {}\n}}", self.id, self.pc, self.get_instruction(), self.stack, self.constraints, symbolic_memory::pretty_print(&(*self.memory), self.mem), symbolic_memory::pretty_print(&self.memory, self.account().storage))
+        write!(f, "State{{\n\tid: {}\n\tpc: {} ({:?})\n\tstack: {:?}\n\tconstraints: {:?}\n\tmemory: {}\n\tstorage: {}\n}}", self.id, self.pc, self.get_instruction(), self.stack, self.constraints, symbolic_memory::pretty_print(&(*self.memory), self.mem), symbolic_memory::pretty_print(&self.memory, self.account().storage))
     }
 }
 
@@ -247,7 +247,7 @@ impl SeState {
         // call_depth
         new_state.call_depth = s.call_depth;
 
-        // constrints
+        // constraints
         new_state.constraints = s.constraints;
 
         // update previous_tx

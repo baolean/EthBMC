@@ -37,7 +37,7 @@ mod se;
 mod test_helpers;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt,
     iter::FromIterator,
     sync::{Arc, Mutex},
@@ -65,7 +65,7 @@ pub use crate::se::{
 
 use crate::bytecode::Instr;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AnalysisResult {
     pub address: Address,
     pub blocks: Vec<usize>,
@@ -92,6 +92,44 @@ pub enum AnalysisSuccess {
 pub struct TimeoutAnalysis {
     pub address: Address,
     pub timeout: Duration,
+}
+
+//
+pub fn forge_analysis(
+    analyzed_address: String,
+    signatures: Vec<String>,
+    storage_info: HashMap<String, (String, HashMap<String, String>)>,
+) //  -> AnalysisResult {
+{
+    let se_env = SeEnviroment::from_forge(analyzed_address, signatures, storage_info);
+
+    // TODO(baolean): configure a solver and its timeout
+    let pool = Solvers::Yice {
+        count: CONFIG.read().unwrap().cores,
+        timeout: 10_000,
+    };
+    {
+        let mut config = CONFIG.write().unwrap();
+        // Symexec config
+        config.loop_bound = 5;
+        config.call_depth_limit = 5;
+        // Executing "prove_xxx" functions
+        config.message_bound = 1;
+        config.arithmetic_simplification = true;
+        // Using concrete calldatacopy
+        config.concrete_copy = true;
+        config.concrete_load = true;
+    }
+
+    let conf = CONFIG.read().unwrap().clone();
+    let res = symbolic_analysis(se_env, conf, pool);
+
+    for l in format!("{}", res).lines() {
+        println!("{}", l);
+    }
+
+    // TODO(baolean): return results; decode tx data in Foundry
+    // return res;
 }
 
 pub fn symbolic_analysis(se_env: SeEnviroment, config: SeConfig, pool: Solvers) -> AnalysisResult {
@@ -510,7 +548,7 @@ impl fmt::Display for PrecompiledContracts {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LoadedAccount {
     pub id: usize,
     pub address: Address,
@@ -569,12 +607,12 @@ impl fmt::Display for LoadedAccount {
         if let Some(ref cov) = self.code_coverage {
             writeln!(f, "Code covered: {:.2}%", 100.0 * cov)?;
         }
-        if !self.initial_storage.is_empty() {
-            writeln!(f, "Initial Storage:")?;
-        }
-        for (addr, value) in &self.initial_storage {
-            writeln!(f, "\t{:x} : {:x}", addr, value)?;
-        }
+        // if !self.initial_storage.is_empty() {
+        //     writeln!(f, "Initial Storage:")?;
+        // }
+        // for (addr, value) in &self.initial_storage {
+        //     writeln!(f, "\t{:x} : {:x}", addr, value)?;
+        // }
         Ok(())
     }
 }

@@ -176,20 +176,21 @@ pub fn new_call(s: &SeState, call_type: CallType) -> Vec<(SeState, EdgeType)> {
 
         let mut transitions = vec![];
 
-        // check for reeantrancy, control flow hijack and precompiled contracts
-        match call_type {
-            CallType::Call | CallType::StaticCall => {
-                set_precompiled_contracts_flags(&mut res, to);
-                if let Some(reeantrancy) = check_for_reeantrancy(&res, &args) {
-                    transitions.push(reeantrancy);
-                }
-            }
-            CallType::CallCode | CallType::DelegateCall => {
-                if let Some(hijack) = check_for_control_flow_hijack(&res, to) {
-                    transitions.push(hijack);
-                }
-            }
-        };
+        // TODO(baolean): temporarily commented out some vulnerability checks
+        // check for reentrancy, control flow hijack and precompiled contracts
+        // match call_type {
+        //     CallType::Call | CallType::StaticCall => {
+        //         set_precompiled_contracts_flags(&mut res, to);
+        //         if let Some(reentrancy) = check_for_reentrancy(&res, &args) {
+        //             transitions.push(reeantrancy);
+        //         }
+        //     }
+        //     CallType::CallCode | CallType::DelegateCall => {
+        //         if let Some(hijack) = check_for_control_flow_hijack(&res, to) {
+        //             transitions.push(hijack);
+        //         }
+        //     }
+        // };
 
         let res = res; // make res imutable from here
 
@@ -562,7 +563,7 @@ fn check_for_control_flow_hijack(s: &SeState, to: &BVal) -> Option<(SeState, Edg
     None
 }
 
-fn check_for_reeantrancy(s: &SeState, args: &CallArgs) -> Option<(SeState, EdgeType)> {
+fn check_for_reentrancy(s: &SeState, args: &CallArgs) -> Option<(SeState, EdgeType)> {
     let mut reentrancy = s.fork();
     let reentrancy_id = s
         .env
