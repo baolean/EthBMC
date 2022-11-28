@@ -493,7 +493,7 @@ impl Analysis {
         }
         if let Some(HaltingReason::Revert) = potential_attack_state.halting_reason {
             if potential_attack_state.account().assert_fail && potential_attack_state.check_sat() {
-                println!("That is an assert failure!");
+                println!("An assert can be violated!");
 
                 if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
                     if self
