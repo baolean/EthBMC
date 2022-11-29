@@ -66,6 +66,6 @@ RUN curl -L https://foundry.paradigm.xyz | bash
 RUN git clone https://github.com/baolean/foundry.git \
   && cd foundry \
   && git checkout symexec \
-  && foundryup --path .
+  && /root/.foundry/bin/foundryup --path .
 
 ENTRYPOINT ["/bin/bash", "EthBMC/start.sh"]
