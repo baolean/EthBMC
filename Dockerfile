@@ -10,10 +10,9 @@ RUN apt-get update \
 RUN apt-get update
 
 # Install smt-solvers: (1) yices2
-RUN wget https://yices.csl.sri.com/releases/2.6.4/yices-2.6.4-x86_64-pc-linux-gnu.tar.gz \
-  && tar -xzvf yices-2.6.4-x86_64-pc-linux-gnu.tar.gz \
-  && cd yices-2.6.4 \
-  && ./install-yices
+RUN add-apt-repository ppa:sri-csl/formal-methods \
+  && apt-get update \
+  && apt-get install -y yices2
 
 # (2) boolector
 RUN git clone https://github.com/boolector/boolector \
@@ -67,6 +66,6 @@ RUN curl -L https://foundry.paradigm.xyz | bash
 RUN git clone https://github.com/baolean/foundry.git \
   && cd foundry \
   && git checkout symexec \
-  && /root/.foundry/bin/foundryup --path .
+  && foundryup --path .
 
 ENTRYPOINT ["/bin/bash", "EthBMC/start.sh"]
