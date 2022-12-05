@@ -46,6 +46,7 @@ use std::{
 
 use clap::{App, Arg};
 use ethereum_newtypes::{Address, Bytes, WU256};
+use evmexec::evm::ForgeInput;
 use parity_connector::BlockSelector;
 use rayon::prelude::*;
 use time::PreciseTime;
@@ -94,13 +95,12 @@ pub struct TimeoutAnalysis {
     pub timeout: Duration,
 }
 
-//
+// Symbolically executing Foundry tests
 pub fn forge_analysis(
     analyzed_address: String,
     signatures: Vec<String>,
     storage_info: HashMap<String, (String, HashMap<String, String>)>,
-) //  -> AnalysisResult {
-{
+) -> Vec<Vec<(String, String, String)>> {
     let se_env = SeEnviroment::from_forge(analyzed_address, signatures, storage_info);
 
     // TODO(baolean): configure a solver and its timeout
@@ -124,12 +124,28 @@ pub fn forge_analysis(
     let conf = CONFIG.read().unwrap().clone();
     let res = symbolic_analysis(se_env, conf, pool);
 
-    for l in format!("{}", res).lines() {
-        println!("{}", l);
-    }
+    let counterexamples: Vec<Vec<ForgeInput>> = if res.attacks.is_some() {
+        res.attacks
+            .unwrap()
+            .into_iter()
+            .map(|a| a.counterexamples)
+            .into_iter()
+            .map(|c| if c.is_some() { c.unwrap() } else { vec![] })
+            .collect()
+    } else {
+        vec![]
+    };
 
-    // TODO(baolean): return results; decode tx data in Foundry
-    // return res;
+    let result: Vec<Vec<(String, String, String)>> = counterexamples
+        .into_iter()
+        .map(|a| {
+            a.into_iter()
+                .map(|input| (input.sender, input.receiver, input.input_data))
+                .collect()
+        })
+        .collect();
+
+    result
 }
 
 pub fn symbolic_analysis(se_env: SeEnviroment, config: SeConfig, pool: Solvers) -> AnalysisResult {

@@ -29,6 +29,13 @@ pub struct EvmInput {
     pub value: WU256,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct ForgeInput {
+    pub input_data: String,
+    pub sender: String,
+    pub receiver: String,
+}
+
 impl Default for Evm {
     fn default() -> Self {
         Self::new()
