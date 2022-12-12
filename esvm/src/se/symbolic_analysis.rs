@@ -455,12 +455,14 @@ impl Analysis {
 
     fn analyze_state_for_attacks(
         &self,
-        mut potential_attack_state: SeState,
+        potential_attack_state: SeState,
         result: &Mutex<Vec<Attack>>,
     ) {
         if let Some(HaltingReason::Revert) = potential_attack_state.halting_reason {
-            if potential_attack_state.account().assert_fail && potential_attack_state.check_sat() {
-                println!("An assert can be violated!");
+            if (potential_attack_state.account().assert_fail
+                || potential_attack_state.account().overflow_check_fail)
+            {
+                info!("An assert or an under/overflow check can fail!");
 
                 if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
                     if self
@@ -500,7 +502,11 @@ impl Analysis {
 
                         let attack = Attack {
                             txs: data,
-                            attack_type: AttackType::AssertFailed,
+                            attack_type: if potential_attack_state.account().assert_fail {
+                                AttackType::AssertFailed
+                            } else {
+                                AttackType::OverflowCheckFailed
+                            },
                             counterexamples: Some(attack_counterexample),
                         };
                         result.lock().unwrap().push(attack);
@@ -754,8 +760,12 @@ impl Analysis {
         let evm = self.execute_concrete_evm(state, attack_data)?;
         for ins in evm.result.ok()?.trace {
             // Detecting assert violations in solc >= 0.8
-            if let Instruction::Revert { panic, .. } = ins.instruction {
-                if panic == WU256::from(U256::from(0x01)) {
+            if let Instruction::Revert {
+                panic,
+                failed_overflow_check,
+            } = ins.instruction
+            {
+                if panic == WU256::from(U256::from(0x01)) || failed_overflow_check {
                     return Some(());
                 }
             }
@@ -979,6 +989,7 @@ pub enum AttackType {
     Reentrancy,
     CanChangeOwner,
     AssertFailed,
+    OverflowCheckFailed,
 }
 
 impl fmt::Display for AttackType {
@@ -994,6 +1005,7 @@ impl fmt::Display for AttackType {
             AttackType::Reentrancy => write!(f, "can trigger reentrancy"),
             AttackType::CanChangeOwner => write!(f, "can change owner variable as attacker"),
             AttackType::AssertFailed => write!(f, "assertion can fail"),
+            AttackType::OverflowCheckFailed => write!(f, "under-/overflow check can fail"),
         }
     }
 }

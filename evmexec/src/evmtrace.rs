@@ -125,9 +125,27 @@ fn parse_trace_line_with_depth(line: &str) -> Option<ParsedTraceLine> {
             }
             0xfd => {
                 let memory = &cap["memory"];
-                if memory.contains("0x4e487b710000000000000000000000000000000000000000000000000000000000000001") {
+                if memory.contains(
+                    // assert
+                    "0x4e487b710000000000000000000000000000000000000000000000000000000000000001",
+                ) {
                     let assert_code: U256 = 0x01.into();
-                    Some(Instruction::Revert { panic: WU256(assert_code) })
+                    Some(Instruction::Revert {
+                        panic: WU256(assert_code),
+                        failed_overflow_check: false,
+                    })
+                    // revert
+                } else if memory.contains("8c379a0")
+                // "Overflow"
+                    && (memory.contains("84f766572666c6f77")
+                    // "Underflow"
+                        || memory.contains("9556e646572666c6f77"))
+                {
+                    let assert_code: U256 = 0x0.into();
+                    Some(Instruction::Revert {
+                        panic: WU256(assert_code),
+                        failed_overflow_check: true,
+                    })
                 } else {
                     None
                 }
@@ -242,6 +260,7 @@ pub enum Instruction {
     },
     Revert {
         panic: WU256,
+        failed_overflow_check: bool,
     },
 }
 

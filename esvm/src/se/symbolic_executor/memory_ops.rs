@@ -367,6 +367,7 @@ pub fn sstore(s: &SeState) -> Vec<(SeState, EdgeType)> {
     vec![]
 }
 
+// TODO(baolean): failed asserts and (specific) require statements
 pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
     let mut res = s.create_succ();
     if let Some((addr, size)) = res.pop2() {
@@ -378,17 +379,41 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
             FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();
         let code = FVal::as_bigint(&mload8(&s.memory, s.mem, &add(&addr, &const_usize(35))))
             .unwrap_or_default();
-        let one = FVal::as_bigint(&const_usize(1)).unwrap_or_default();
+        let data = FVal::as_bigint(&mload(&s.memory, s.mem, &add(&addr, &const_usize(64))))
+            .unwrap_or_default();
 
         // Detecting failed asserts in solc >= 0.8 based on returndata
         if loaded_returndata
             == U256::from_dec_str(
+                // 0x4e487b710
                 "35408467139433450592217433187231851964531694900788300625387963629091585785856",
             )
             .unwrap()
-            && code == one
+            && code == FVal::as_bigint(&const_usize(1)).unwrap_or_default()
         {
             res.account_mut().assert_fail = true
+        } else if loaded_returndata
+        // Detecting reverts w/ "Overflow" and "Underflow" return data
+            == U256::from_dec_str(
+                // 0x8c379a0
+                "3963877391197344453575983046348115674221700746820753546331534351508065746944",
+            )
+            .unwrap()
+            && (data
+                == U256::from_dec_str(
+                    // Error("Overflow")
+                    "251636477502106235456683463021812758568253231059578480337658486718464",
+                )
+                .unwrap()
+                || data
+                    == U256::from_dec_str(
+                        // Error("Underflow")
+                        "224047949782305598448357849893453284218172955536966217593378024980480",
+                    )
+                    .unwrap())
+        {
+            info!("The under/overflow check failed!");
+            res.account_mut().overflow_check_fail = true
         }
 
         return vec![(res, edge_terminal())];
