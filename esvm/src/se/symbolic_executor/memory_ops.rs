@@ -6,6 +6,7 @@ use crate::se::{
     expr::bval::*,
     expr::symbolic_memory::{self, *},
     symbolic_edge::*,
+    symbolic_executor::memory_ops::MemoryOperation::Write256,
     symbolic_state::{Flags, HaltingReason, SeState},
 };
 
@@ -375,11 +376,23 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
         res.halting_reason = Some(HaltingReason::Revert);
         res.revert_state_changes();
 
+        let overflow_check_failed = match &res.memory[res.mem].op {
+            Write256 {
+                parent: _,
+                address: _,
+                value,
+            } => FVal::as_bigint(value).unwrap_or_default()
+                == U256::from_dec_str(
+                    // 4f766572666c6f77 -- abi-encoded Error("overflow")
+                    "35941903152323301424837430127755677394685895577807511304717771392927601262592",
+                )
+                .unwrap(),
+            _ => false,
+        };
+
         let loaded_returndata =
             FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();
         let code = FVal::as_bigint(&mload8(&s.memory, s.mem, &add(&addr, &const_usize(35))))
-            .unwrap_or_default();
-        let data = FVal::as_bigint(&mload(&s.memory, s.mem, &add(&addr, &const_usize(64))))
             .unwrap_or_default();
 
         // Detecting failed asserts in solc >= 0.8 based on returndata
@@ -392,25 +405,8 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
             && code == FVal::as_bigint(&const_usize(1)).unwrap_or_default()
         {
             res.account_mut().assert_fail = true
-        } else if loaded_returndata
-        // Detecting reverts w/ "Overflow" and "Underflow" return data
-            == U256::from_dec_str(
-                // 0x8c379a0
-                "3963877391197344453575983046348115674221700746820753546331534351508065746944",
-            )
-            .unwrap()
-            && (data
-                == U256::from_dec_str(
-                    // Error("Overflow")
-                    "251636477502106235456683463021812758568253231059578480337658486718464",
-                )
-                .unwrap()
-                || data
-                    == U256::from_dec_str(
-                        // Error("Underflow")
-                        "224047949782305598448357849893453284218172955536966217593378024980480",
-                    )
-                    .unwrap())
+        } else if overflow_check_failed
+        // Detecting reverts w/ "Overflow"
         {
             info!("The under/overflow check failed!");
             // Reporting failed arithmetic checks in all contracts

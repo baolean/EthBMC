@@ -858,6 +858,7 @@ impl Analysis {
         }
         let res = load_state.get_values_for_array(loads.as_slice())?;
         let balance = load_state.get_value(&load_state.env.get_tx(tx).callvalue)?;
+        // TODO(baolean): get timestamp value for the counterexample
         tx_data_from_bval_vec(balance, res)
     }
 
