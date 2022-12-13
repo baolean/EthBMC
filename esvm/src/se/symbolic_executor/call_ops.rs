@@ -453,6 +453,7 @@ fn create_return_state(
             return_state.push_constraint(eql(&callres_execution, &zero()));
             return_state.returndata = end_state.returndata;
             return_state.returndata_size = end_state.returndata_size;
+            return_state.failed_overflow_check = end_state.failed_overflow_check;
             return_state.mem = memcopy(
                 Arc::make_mut(&mut memory),
                 s.mem,

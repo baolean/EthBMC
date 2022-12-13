@@ -413,7 +413,8 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
                     .unwrap())
         {
             info!("The under/overflow check failed!");
-            res.account_mut().overflow_check_fail = true
+            // Reporting failed arithmetic checks in all contracts
+            res.failed_overflow_check = true
         }
 
         return vec![(res, edge_terminal())];

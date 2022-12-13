@@ -459,8 +459,8 @@ impl Analysis {
         result: &Mutex<Vec<Attack>>,
     ) {
         if let Some(HaltingReason::Revert) = potential_attack_state.halting_reason {
-            if (potential_attack_state.account().assert_fail
-                || potential_attack_state.account().overflow_check_fail)
+            if potential_attack_state.account().assert_fail
+                || potential_attack_state.failed_overflow_check
             {
                 info!("An assert or an under/overflow check can fail!");
 

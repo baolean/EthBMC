@@ -82,6 +82,8 @@ pub struct ResultState {
     /// The halting reason for an end of path
     pub halting_reason: Option<HaltingReason>,
 
+    pub failed_overflow_check: bool,
+
     pub call_depth: usize,
 
     pub old_memory: Arc<HashSet<MVal>>,
@@ -137,6 +139,9 @@ pub struct SeState {
 
     /// The halting reason for an end of path
     pub halting_reason: Option<HaltingReason>,
+
+    /// The flag indicating a failed arithmetic check at the end of the path
+    pub failed_overflow_check: bool,
 
     /// The counter for the call depth
     pub call_depth: usize,
@@ -202,6 +207,7 @@ impl SeState {
 
         let call_depth = 0;
         let halting_reason = None;
+        let failed_overflow_check = false;
         let old_memory = Arc::new(HashSet::new());
         let env = Arc::clone(env);
         let keccaks = Arc::new(HashSet::new());
@@ -225,6 +231,7 @@ impl SeState {
             returndata_size,
             call_depth,
             halting_reason,
+            failed_overflow_check,
             old_memory,
             flags: Default::default(),
             context,
@@ -305,6 +312,7 @@ impl SeState {
             returndata_size: self.returndata_size.clone(),
             call_depth: self.call_depth,
             halting_reason: self.halting_reason.clone(),
+            failed_overflow_check: self.failed_overflow_check.clone(),
             old_memory: self.old_memory.clone(),
             flags: self.flags,
             context: Arc::clone(&self.context),
@@ -333,6 +341,7 @@ impl SeState {
             returndata_size: self.returndata_size.clone(),
             call_depth: self.call_depth,
             halting_reason: self.halting_reason.clone(),
+            failed_overflow_check: self.failed_overflow_check.clone(),
             old_memory: self.old_memory.clone(),
             flags: self.flags,
             context: Arc::clone(&self.context),
@@ -355,6 +364,7 @@ impl SeState {
             returndata: self.returndata,
             returndata_size: Arc::clone(&self.returndata_size),
             halting_reason: self.halting_reason.clone(),
+            failed_overflow_check: self.failed_overflow_check.clone(),
             old_memory: Arc::clone(&self.old_memory),
             reads: Arc::clone(&self.reads),
             previous_tx: self.previous_tx.clone(),
