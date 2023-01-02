@@ -55,7 +55,7 @@ WORKDIR /app
 # Install EthBMC
 RUN git clone https://github.com/baolean/EthBMC.git \
   && cd EthBMC \
-  && git checkout forge \
+  && git checkout ranges \
   && cargo build --release \
   && cargo build --lib \
   && mkdir queries
