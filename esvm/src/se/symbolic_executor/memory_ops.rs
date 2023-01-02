@@ -254,6 +254,7 @@ pub fn keccak(s: &SeState) -> Vec<(SeState, EdgeType)> {
 }
 
 pub fn storage_load(s: &SeState) -> Vec<(SeState, EdgeType)> {
+    // TODO(baolean): symbolic storage processing
     let mut res = s.create_succ();
     if let Some(ref addr) = res.stack.pop() {
         let load = if cfg!(feature = "keccak") {
@@ -283,10 +284,10 @@ pub fn storage_load(s: &SeState) -> Vec<(SeState, EdgeType)> {
             if let Some(key) = mapping_key {
                 {
                     if let Some(mem) = res.account().mappings.get(&key) {
-                        debug!("Load from mapping: {:?}", key);
+                        info!("Load from mapping: {:?}", key);
                         sload(&s.memory, *mem, addr)
                     } else {
-                        debug!("Mapping never writen to, returning zero!");
+                        info!("Mapping never writen to, returning zero!");
                         zero()
                     }
                 }
@@ -305,7 +306,7 @@ pub fn storage_load(s: &SeState) -> Vec<(SeState, EdgeType)> {
 
 pub fn sstore(s: &SeState) -> Vec<(SeState, EdgeType)> {
     if s.flags.contains(Flags::STATIC) {
-        warn!("State changing sstore operation during static call, dropping path!");
+        info!("State changing sstore operation during static call, dropping path!");
         return vec![];
     }
     let mut res = s.create_succ();
@@ -336,7 +337,7 @@ pub fn sstore(s: &SeState) -> Vec<(SeState, EdgeType)> {
 
             if let Some(key) = mapping_key.clone() {
                 {
-                    debug!("Write to mapping: {:?}", key);
+                    info!("Write to mapping: {:?}", key);
                     let entry_key;
                     {
                         let mem = symbolic_memory::create_new_memory(
@@ -344,6 +345,7 @@ pub fn sstore(s: &SeState) -> Vec<(SeState, EdgeType)> {
                             fresh_var_name("mapping"),
                             MemoryType::Storage,
                             None,
+                            Some(res.account),
                         );
                         let mapping = Arc::make_mut(&mut res.account_mut().mappings);
                         entry_key = *mapping.entry(key.clone()).or_insert_with(|| mem);
@@ -402,7 +404,7 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
                 "35408467139433450592217433187231851964531694900788300625387963629091585785856",
             )
             .unwrap()
-            && code == FVal::as_bigint(&const_usize(1)).unwrap_or_default()
+            && code == FVal::as_bigint(&one()).unwrap_or_default()
         {
             res.account_mut().assert_fail = true
         } else if overflow_check_failed
@@ -438,6 +440,7 @@ pub fn set_returndata(s: &mut SeState, addr: &BVal, size: &BVal) {
         name,
         MemoryType::Data,
         Some(size.clone()),
+        None,
     );
     returndata = memcopy(
         Arc::make_mut(&mut s.memory),
@@ -490,6 +493,7 @@ mod tests {
             format!("{}_mem_1", state.account().name.clone()),
             MemoryType::Memory,
             None,
+            None,
         );
         correct_mem = word_write(&mut memory, correct_mem, store_addr, &const_usize(0x01));
 
@@ -525,6 +529,7 @@ mod tests {
             format!("{}_data", state.input_tx().name.clone()),
             MemoryType::Data,
             Some(state.input_tx().calldata_size.clone()),
+            None,
         );
         let correct_bval = mload(&memory, correct_data, &store_addr);
 
@@ -563,6 +568,7 @@ mod tests {
             format!("{}_returndata", state.account().name),
             MemoryType::Data,
             Some(const_usize(0x41414141)),
+            None,
         );
         returndata = memcopy(
             &mut memory,

@@ -301,6 +301,7 @@ pub fn arguments<'a>(app: App<'a, 'a>) -> App<'a, 'a> {
         // Analysis
         .arg(Arg::with_name("debug_graph").short("d").long("debug-grap").help("Dump debug graph after analysis"))
         .arg(Arg::with_name("no_verify").long("no-verify").help("Skip verification phase."))
+        .arg(Arg::with_name("symbolic_storage").long("symbolic-storage").help("Use symbolic storage mode."))
         .arg(Arg::with_name("dump-solver").long("dump-solver").help("Dump all solver queries to ./queries"))
         .arg(Arg::with_name("ip").long("ip").takes_value(true).help("The ip of a running node."))
         .arg(Arg::with_name("port").long("port").takes_value(true).help("The port of a running node."))
@@ -310,7 +311,7 @@ pub fn set_global_config(matches: &clap::ArgMatches) {
     // set config
     let mut config = CONFIG.write().unwrap();
 
-    // always use thee optimizations
+    // always use these optimizations
     config.arithmetic_simplification = true;
     config.concrete_load = true;
 
@@ -336,6 +337,9 @@ pub fn set_global_config(matches: &clap::ArgMatches) {
     }
     if matches.is_present("no_verify") {
         config.no_verify = true;
+    }
+    if matches.is_present("symbolic_storage") {
+        config.symbolic_storage = true;
     }
     if matches.is_present("debug_graph") {
         config.dgraph = true;

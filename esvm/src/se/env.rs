@@ -15,7 +15,7 @@ use yaml_rust::Yaml;
 
 lazy_static! {
     pub static ref GLOBAL_COVERAGE_MAP: Mutex<HashMap<AccountId, CodeCoverage>> =
-        { Mutex::new(HashMap::new()) };
+        Mutex::new(HashMap::new());
 }
 
 use crate::disasm::CodeCoverage;
@@ -142,7 +142,8 @@ impl SeEnviroment {
 
         // create env
         let attacker = env.new_attacker_account(&mut memory);
-        let _hijack = env.new_hijack_account(&mut memory);
+        // TODO(baolean): temporarily commented out other attacks' detection
+        // let _hijack = env.new_hijack_account(&mut memory);
 
         let addr_vec = hexdecode::decode(addr.as_bytes()).unwrap();
         let account_addr = const_vec(addr_vec.as_slice());
@@ -177,7 +178,8 @@ impl SeEnviroment {
         };
         let mut memory = symbolic_memory::new_memory();
         let attacker = env.new_attacker_account(&mut memory);
-        let _hijack = env.new_hijack_account(&mut memory);
+        // TODO(baolean): temporarily commented out other attacks' detection
+        // let _hijack = env.new_hijack_account(&mut memory);
         let mut victim = AccountId(0);
         let mut id;
 
@@ -269,7 +271,8 @@ impl SeEnviroment {
         let mut env = Env::new();
         let mut memory = symbolic_memory::new_memory();
         let attacker = env.new_attacker_account(&mut memory);
-        let _hijack = env.new_hijack_account(&mut memory);
+        // TODO(baolean): temporarily commented out other attacks' detection
+        // let _hijack = env.new_hijack_account(&mut memory);
         let mut victim = AccountId(0);
         let mut id;
 
@@ -593,6 +596,16 @@ impl Env {
         }
     }
 
+    // pub fn update_account_generated_storage(
+    //     &mut self,
+    //     account_id: &AccountId,
+    //     addr: BVal,
+    //     value: BVal,
+    // ) {
+    //     let account = self.get_account_mut(account_id);
+    //     account.generated_storage.push((addr, value));
+    // }
+
     pub fn try_load_account_from_chain(
         &mut self,
         memory: &mut SymbolicMemory,
@@ -814,18 +827,19 @@ impl Env {
         AccountId(self.acc_counter)
     }
 
-    pub fn new_hijack_account(&mut self, memory: &mut SymbolicMemory) -> AccountId {
-        let id = self.new_acc_id();
-        let acc = Account::with_addr(
-            memory,
-            id,
-            &fresh_account_name("hijack"),
-            &const256(HIJACK_ADDR),
-        );
-        self.accounts.insert(id, acc);
-        self.addresses.insert(const256(HIJACK_ADDR), id);
-        id
-    }
+    // TODO(baolean): temporarily commented out other attacks' detection
+    // pub fn new_hijack_account(&mut self, memory: &mut SymbolicMemory) -> AccountId {
+    //     let id = self.new_acc_id();
+    //     let acc = Account::with_addr(
+    //         memory,
+    //         id,
+    //         &fresh_account_name("hijack"),
+    //         &const256(HIJACK_ADDR),
+    //     );
+    //     self.accounts.insert(id, acc);
+    //     self.addresses.insert(const256(HIJACK_ADDR), id);
+    //     id
+    // }
 
     pub fn new_attacker_account(&mut self, memory: &mut SymbolicMemory) -> AccountId {
         let id = self.new_acc_id();
@@ -963,6 +977,7 @@ impl Transaction {
             format!("{}_data", name),
             MemoryType::Data,
             Some(calldata_size.clone()),
+            None,
         );
         let constraints = vec![];
         Transaction {
@@ -1059,6 +1074,8 @@ pub struct Account {
     pub initial_storage: Option<Vec<(WU256, WU256)>>,
     pub initial_balance: Option<WU256>,
     pub initial_attacker_balance: Option<BVal>,
+    // pub generated_storage: Option<Vec<(FVal, FVal)>>,
+    pub generated_storage: Vec<(BVal, BVal)>,
     code: Option<Vec<u8>>,
     codesize: usize,
 
@@ -1075,6 +1092,7 @@ impl Account {
             format!("{}_storage", name),
             MemoryType::Storage,
             None,
+            Some(id),
         );
         let constraints = vec![];
         let selfdestruct = false;
@@ -1088,6 +1106,7 @@ impl Account {
         let initial_storage = None;
         let initial_balance = None;
         let initial_attacker_balance = None;
+        let generated_storage = Vec::new();
 
         Account {
             id,
@@ -1105,6 +1124,7 @@ impl Account {
             initial_storage,
             initial_balance,
             initial_attacker_balance,
+            generated_storage,
         }
     }
 
@@ -1194,12 +1214,15 @@ impl Into<genesis::Genesis> for Env {
 impl Into<genesis::Account> for Account {
     fn into(self) -> genesis::Account {
         let storage = if let Some(stor) = self.initial_storage {
+            println!("inserting the values into storage");
             let mut s = HashMap::new();
             for (addr, value) in stor {
+                println!("initial storage: {:?} {:?}", addr, value);
                 s.insert(addr, value);
             }
             s
         } else {
+            // TODO(baolean): add the generated storage values for this account
             HashMap::new()
         };
         genesis::Account::new(
@@ -1250,6 +1273,7 @@ victim: 0x780771f6a176a937e45d491d180df424d9e15fa6";
             &mut memory,
             format!("{}_storage", vic.name.clone()),
             MemoryType::Storage,
+            None,
             None,
         );
         storage = word_write(

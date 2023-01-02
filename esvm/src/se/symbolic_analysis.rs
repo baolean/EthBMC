@@ -26,15 +26,15 @@ use crate::se::{
     expr::{
         bval::*,
         solver::{create_pool, SolverPool, Solvers},
-        symbolic_memory::{MVal, SymbolicMemory},
+        symbolic_memory::{MVal, MemoryType, SymbolicMemory},
     },
     symbolic_graph::SymbolicGraph,
-    symbolic_state::{Flags, HaltingReason, ResultState, SeState},
+    symbolic_state::{HaltingReason, ResultState, SeState},
 };
 use crate::{LoadedAccount, PrecompiledContracts};
 
 #[cfg(test)]
-use crate::se::expr::symbolic_memory::{self, MemoryType};
+use crate::se::expr::symbolic_memory::{self};
 
 lazy_static! {
     pub static ref CONFIG: RwLock<SeConfig> = RwLock::new(SeConfig::new());
@@ -80,6 +80,9 @@ pub struct SeConfig {
     /// Disable the verification phase
     pub no_verify: bool,
 
+    /// Use symbolic storage mode
+    pub symbolic_storage: bool,
+
     /// Dump solver queries
     pub dump_solver: bool,
 
@@ -118,6 +121,7 @@ impl SeConfig {
             message_bound: 5,
             dgraph: false,
             no_verify: false,
+            symbolic_storage: false,
             dump_solver: false,
             solver_timeout: 120_000,
             parity: None,
@@ -165,6 +169,7 @@ impl Context {
             &mut memory,
             "test".to_string(),
             MemoryType::Storage,
+            None,
             None,
         );
         Self::new(
@@ -704,7 +709,37 @@ impl Analysis {
         state: &SeState,
         attack_data: &[TxData],
     ) -> Option<evmexec::evm::Execution> {
-        let genesis: genesis::Genesis = (*state.env).clone().into();
+        let mut genesis: genesis::Genesis = (*state.env).clone().into();
+
+        // TODO(baolean): update geth genesis w/ counterexample generated values
+        if state.context.config().symbolic_storage {
+            for read in state.reads.iter() {
+                if state.memory[*read.0].memory_type == MemoryType::Storage {
+                    for op in read.1 {
+                        match op.val().clone() {
+                            Val256::FSLoad(node_index, addr) => {
+                                let account_id = state.memory[node_index].account_id.unwrap();
+                                let value = state.get_value(op)?;
+
+                                let a: Address =
+                                    BitVec::as_bigint(&state.env.get_account(&account_id).addr)
+                                        .unwrap()
+                                        .into();
+
+                                // TODO(baolean): check the result of storage update
+                                genesis.update_account_storage(
+                                    &a,
+                                    FVal::as_bigint(&addr)?.into(),
+                                    FVal::as_bigint(&value)?.into(),
+                                );
+                            }
+                            _ => (),
+                        };
+                    }
+                }
+            }
+        }
+
         let mut evm: Evm = genesis.into();
         let sender: Address = BitVec::as_bigint(&state.env.get_account(&self.from).addr)
             .unwrap()
@@ -1026,7 +1061,7 @@ impl fmt::Display for AttackType {
             AttackType::Reentrancy => write!(f, "can trigger reentrancy"),
             AttackType::CanChangeOwner => write!(f, "can change owner variable as attacker"),
             AttackType::AssertFailed => write!(f, "assertion can fail"),
-            AttackType::OverflowCheckFailed => write!(f, "under-/overflow check can fail"),
+            AttackType::OverflowCheckFailed => write!(f, "overflow check can fail"),
         }
     }
 }

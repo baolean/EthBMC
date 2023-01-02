@@ -8,6 +8,7 @@ use petgraph::{
     Directed, Direction,
 };
 
+use crate::env::AccountId;
 #[cfg(test)]
 use crate::se::expr::bval::compare_bval;
 
@@ -25,15 +26,15 @@ pub fn create_new_memory(
     name: String,
     memory_type: MemoryType,
     calldata_size: Option<BVal>,
+    account_id: Option<AccountId>,
 ) -> MVal {
-    let info = MemoryInfo::new(name, memory_type, calldata_size.clone());
+    let info = MemoryInfo::new(name, memory_type, calldata_size.clone(), account_id);
     let root = memory.add_node(Arc::new(info));
     match memory_type {
-        MemoryType::Storage | MemoryType::Memory => {
-            memset_unlimited(memory, root, &const_usize(0), &const_usize(0))
-        }
+        MemoryType::Memory => memset_unlimited(memory, root, &const_usize(0), Some(const_usize(0))),
+        MemoryType::Storage => memset_unlimited(memory, root, &const_usize(0), None),
         MemoryType::Data => {
-            memset_unlimited(memory, root, &calldata_size.unwrap(), &const_usize(0))
+            memset_unlimited(memory, root, &calldata_size.unwrap(), Some(const_usize(0)))
         }
     }
 }
@@ -44,16 +45,18 @@ pub struct MemoryInfo {
     pub memory_type: MemoryType,
     pub op: MemoryOperation,
 
+    pub account_id: Option<AccountId>,
     name: Arc<String>,
     calldata_size: Option<BVal>,
 }
 
-// this function soley exists to compare similar memories when not the entire graph is set up, thus
+// this function solely exists to compare similar memories when not the entire graph is set up, thus
 // the indices do not match
 #[cfg(test)]
 pub fn memory_info_equal(a: &MemoryInfo, b: &MemoryInfo) -> bool {
     if !(a.memory_generation == b.memory_generation
         && a.memory_type == b.memory_type
+        && a.account_id == b.account_id
         && a.name == b.name
         && a.calldata_size == b.calldata_size)
     {
@@ -143,7 +146,12 @@ pub fn memory_info_equal(a: &MemoryInfo, b: &MemoryInfo) -> bool {
 }
 
 impl MemoryInfo {
-    pub fn new(name: String, memory_type: MemoryType, calldata_size: Option<BVal>) -> Self {
+    pub fn new(
+        name: String,
+        memory_type: MemoryType,
+        calldata_size: Option<BVal>,
+        account_id: Option<AccountId>,
+    ) -> Self {
         let memory_generation = 0;
         let name = Arc::new(name);
         let op = MemoryOperation::Init;
@@ -153,6 +161,7 @@ impl MemoryInfo {
             memory_type,
             op,
             calldata_size,
+            account_id,
         }
     }
 
@@ -161,12 +170,14 @@ impl MemoryInfo {
         let name = Arc::clone(&info.name);
         let memory_type = info.memory_type;
         let calldata_size = info.calldata_size.clone();
+        let account_id = info.account_id;
         Self {
             memory_generation,
             name,
             memory_type,
             op,
             calldata_size,
+            account_id,
         }
     }
 
@@ -225,7 +236,7 @@ pub enum MemoryOperation {
     MemsetUnlimited {
         parent: MVal,
         index: BVal,
-        value: BVal,
+        value: Option<BVal>,
     },
     Memcopy {
         parent: MVal,
@@ -318,7 +329,7 @@ pub fn memset_unlimited(
     memory: &mut SymbolicMemory,
     parent: NodeIndex,
     index: &BVal,
-    val: &BVal,
+    val: Option<BVal>,
 ) -> MVal {
     if !cfg!(feature = "memcopy") {
         return parent;
@@ -332,7 +343,8 @@ pub fn memset_unlimited(
             MemoryOperation::MemsetUnlimited {
                 parent,
                 index: Arc::clone(index),
-                value: Arc::clone(val),
+                // TODO(baolean):
+                value: val, // Some(Arc::clone(val.as_ref().unwrap)),
             },
         );
     }

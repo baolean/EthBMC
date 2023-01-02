@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::se::{
-    config::HIJACK_ADDR,
+    // config::HIJACK_ADDR,
     env::{AccountId, TxId},
     expr::{
         bval::*,
@@ -226,7 +226,7 @@ pub fn new_call(s: &SeState, call_type: CallType) -> Vec<(SeState, EdgeType)> {
                     call.account().addr,
                     addr
                 );
-                // no account code, i.e. we only tramsfer money
+                // no account code, i.e. we only transfer money
                 let callres = fresh_var(&format!(
                     "call_{}_to_{}_normal",
                     call.account().name,
@@ -549,54 +549,54 @@ pub fn create_new_outgoing(
     outgoing_tx
 }
 
-fn check_for_control_flow_hijack(s: &SeState, to: &BVal) -> Option<(SeState, EdgeType)> {
-    let mut hijack = s.fork();
-    hijack.push_constraint(eql(to, &const256(HIJACK_ADDR)));
-    if hijack.check_sat() {
-        hijack.flags |= Flags::HIJACK_CONTROL_FLOW;
+// fn check_for_control_flow_hijack(s: &SeState, to: &BVal) -> Option<(SeState, EdgeType)> {
+//     let mut hijack = s.fork();
+//     hijack.push_constraint(eql(to, &const256(HIJACK_ADDR)));
+//     if hijack.check_sat() {
+//         hijack.flags |= Flags::HIJACK_CONTROL_FLOW;
 
-        let callres_hijack = fresh_var(&format!("call_code_{}_hijack", hijack.account().name,));
-        hijack.push_constraint(eql(&callres_hijack, &one()));
-        hijack.stack.push(callres_hijack);
+//         let callres_hijack = fresh_var(&format!("call_code_{}_hijack", hijack.account().name,));
+//         hijack.push_constraint(eql(&callres_hijack, &one()));
+//         hijack.stack.push(callres_hijack);
 
-        return Some((hijack, edge_call_ret()));
-    }
-    None
-}
+//         return Some((hijack, edge_call_ret()));
+//     }
+//     None
+// }
 
-fn check_for_reentrancy(s: &SeState, args: &CallArgs) -> Option<(SeState, EdgeType)> {
-    let mut reentrancy = s.fork();
-    let reentrancy_id = s
-        .env
-        .try_get_account_id_by_addr(&const256(HIJACK_ADDR))
-        .unwrap();
+// fn check_for_reentrancy(s: &SeState, args: &CallArgs) -> Option<(SeState, EdgeType)> {
+//     let mut reentrancy = s.fork();
+//     let reentrancy_id = s
+//         .env
+//         .try_get_account_id_by_addr(&const256(HIJACK_ADDR))
+//         .unwrap();
 
-    // create new outgoing tx
-    let _outgoing_tx = create_new_outgoing(
-        &mut reentrancy,
-        &args.gas,
-        &args.in_size,
-        &args.out_size,
-        &args.in_off,
-        &args.value,
-        TxType::Call(*reentrancy_id),
-    );
+//     // create new outgoing tx
+//     let _outgoing_tx = create_new_outgoing(
+//         &mut reentrancy,
+//         &args.gas,
+//         &args.in_size,
+//         &args.out_size,
+//         &args.in_off,
+//         &args.value,
+//         TxType::Call(*reentrancy_id),
+//     );
 
-    reentrancy.push_constraint(eql(&args.to, &const256(HIJACK_ADDR)));
-    reentrancy.push_constraint(lt(&const_usize(2300), &args.gas));
+//     reentrancy.push_constraint(eql(&args.to, &const256(HIJACK_ADDR)));
+//     reentrancy.push_constraint(lt(&const_usize(2300), &args.gas));
 
-    if reentrancy.check_sat() {
-        reentrancy.flags |= Flags::REENTRANCY;
+//     if reentrancy.check_sat() {
+//         reentrancy.flags |= Flags::REENTRANCY;
 
-        let callres_reeentrancy =
-            fresh_var(&format!("reentrancy_{}_res", reentrancy.account().name,));
-        reentrancy.push_constraint(eql(&callres_reeentrancy, &one()));
-        reentrancy.stack.push(callres_reeentrancy);
+//         let callres_reeentrancy =
+//             fresh_var(&format!("reentrancy_{}_res", reentrancy.account().name,));
+//         reentrancy.push_constraint(eql(&callres_reeentrancy, &one()));
+//         reentrancy.stack.push(callres_reeentrancy);
 
-        return Some((reentrancy, edge_call_ret()));
-    }
-    None
-}
+//         return Some((reentrancy, edge_call_ret()));
+//     }
+//     None
+// }
 
 #[cfg(test)]
 mod tests {

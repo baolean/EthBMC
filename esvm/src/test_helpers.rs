@@ -15,7 +15,8 @@ pub fn generate_test_graph(ins: Vec<Instr>) -> SymbolicGraph {
 
     let attacker = env.new_attacker_account(&mut memory);
     let victim = env.new_victim_account(&mut memory, &vec![]);
-    let _hijack = env.new_hijack_account(&mut memory);
+    // TODO(baolean): temporarily commented out other attacks' detection
+    // let _hijack = env.new_hijack_account(&mut memory);
     let inital_tx = env.new_attacker_tx(&mut memory, attacker, victim);
 
     let dasm = Disasm::new(ins);
@@ -51,7 +52,8 @@ pub fn generate_test_state() -> SeState {
 
     let attacker = env.new_attacker_account(&mut memory);
     let victim = env.new_victim_account(&mut memory, &vec![]);
-    let _hijack = env.new_hijack_account(&mut memory);
+    // TODO(baolean): temporarily commented out other attacks' detection
+    // let _hijack = env.new_hijack_account(&mut memory);
     let inital_tx = env.new_attacker_tx(&mut memory, attacker, victim);
 
     let dasm = Disasm::new(vec![]);
