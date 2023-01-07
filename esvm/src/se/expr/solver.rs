@@ -37,6 +37,7 @@ impl<'a> SolverHandle<'a> {
     }
 
     pub fn get_value(&mut self, value: &str) -> Option<BVal> {
+        println!("form val: {:?}", value);
         self.as_mut().get_value(value)
     }
     pub fn get_values(&mut self, values: &[String]) -> Option<Vec<BVal>> {
@@ -48,9 +49,11 @@ impl<'a> SolverHandle<'a> {
         let worker = self.worker.as_mut().unwrap();
 
         for def in builder.defs() {
+            // println!("def: {:?}", def);
             worker.push_formula(def);
         }
         for assert in builder.asserts() {
+            // println!("assert: {:?}", assert);
             worker.push_formula(assert);
         }
     }

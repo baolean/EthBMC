@@ -467,7 +467,7 @@ impl Analysis {
             if potential_attack_state.account().assert_fail
                 || potential_attack_state.failed_overflow_check
             {
-                info!("An assert or an under/overflow check can fail!");
+                println!("An assert or an under/overflow check can fail!");
 
                 if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
                     if self
@@ -720,7 +720,11 @@ impl Analysis {
                             Val256::FSLoad(node_index, addr) => {
                                 let account_id = state.memory[node_index].account_id.unwrap();
                                 let value = state.get_value(op)?;
-
+                                // TODO(baolean): concretize the location if it's symbolic
+                                // let key = match &addr.val().clone() {
+                                //     Val256::FConst(_) | Val256::FConst8(_) => addr,
+                                //     _ => state.get_value(&addr)?,
+                                // };
                                 let a: Address =
                                     BitVec::as_bigint(&state.env.get_account(&account_id).addr)
                                         .unwrap()
@@ -729,6 +733,7 @@ impl Analysis {
                                 // TODO(baolean): check the result of storage update
                                 genesis.update_account_storage(
                                     &a,
+                                    // FVal::as_bigint(&key)?.into(),
                                     FVal::as_bigint(&addr)?.into(),
                                     FVal::as_bigint(&value)?.into(),
                                 );

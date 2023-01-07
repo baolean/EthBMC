@@ -1214,15 +1214,12 @@ impl Into<genesis::Genesis> for Env {
 impl Into<genesis::Account> for Account {
     fn into(self) -> genesis::Account {
         let storage = if let Some(stor) = self.initial_storage {
-            println!("inserting the values into storage");
             let mut s = HashMap::new();
             for (addr, value) in stor {
-                println!("initial storage: {:?} {:?}", addr, value);
                 s.insert(addr, value);
             }
             s
         } else {
-            // TODO(baolean): add the generated storage values for this account
             HashMap::new()
         };
         genesis::Account::new(

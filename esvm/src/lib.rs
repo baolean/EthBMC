@@ -119,6 +119,8 @@ pub fn forge_analysis(
         // Using concrete calldatacopy
         config.concrete_copy = true;
         config.concrete_load = true;
+        // TODO(baolean): configure
+        config.symbolic_storage = true;
     }
 
     let conf = CONFIG.read().unwrap().clone();

@@ -228,6 +228,7 @@ fn extract_mapping_key(memory: &SymbolicMemory, val: &BVal) -> Option<BVal> {
                 _ => return None,
             }
             let position = mload(memory, *mem, &add(offset, &const_usize(0x20)));
+            println!("position: {:?}", position);
             if !matches!(position, Val256::FConst(..)) {
                 return None;
             }
@@ -284,10 +285,12 @@ pub fn storage_load(s: &SeState) -> Vec<(SeState, EdgeType)> {
             if let Some(key) = mapping_key {
                 {
                     if let Some(mem) = res.account().mappings.get(&key) {
-                        info!("Load from mapping: {:?}", key);
+                        info!("Load from mapping: {:?}", s.memory[*mem]);
                         sload(&s.memory, *mem, addr)
                     } else {
                         info!("Mapping never writen to, returning zero!");
+                        // TODO(baolean): return a symbolic value instead of zero
+                        // sload(&s.memory, s.account().storage, addr)
                         zero()
                     }
                 }
