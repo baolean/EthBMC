@@ -49,11 +49,9 @@ impl<'a> SolverHandle<'a> {
         let worker = self.worker.as_mut().unwrap();
 
         for def in builder.defs() {
-            // println!("def: {:?}", def);
             worker.push_formula(def);
         }
         for assert in builder.asserts() {
-            // println!("assert: {:?}", assert);
             worker.push_formula(assert);
         }
     }

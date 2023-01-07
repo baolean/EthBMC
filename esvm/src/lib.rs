@@ -49,6 +49,7 @@ use ethereum_newtypes::{Address, Bytes, WU256};
 use evmexec::evm::ForgeInput;
 use parity_connector::BlockSelector;
 use rayon::prelude::*;
+use std::convert::TryFrom;
 use time::PreciseTime;
 
 use crate::se::{
@@ -95,32 +96,63 @@ pub struct TimeoutAnalysis {
     pub timeout: Duration,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ForgeConfig {
+    /// The flag indicating whether to assume that default storage values are symbolic
+    pub symbolic_storage: bool,
+    /// The flag indicating whether to perform geth-based concrete counterexample validation
+    pub concrete_validation: bool,
+    /// The SMT solver to be used during symbolic analysis {0: z3, 1: boolector, 2: yices2}
+    pub solver: u8,
+    /// The timeout (ms) for the solver
+    pub solver_timeout: u32,
+    /// The number of loops to be unrolled in a single execution
+    pub loop_bound: u32,
+    /// The number of calls symbolically analyzed in a sequence
+    pub call_bound: u32,
+}
+
 // Symbolically executing Foundry tests
 pub fn forge_analysis(
     analyzed_address: String,
     signatures: Vec<String>,
     storage_info: HashMap<String, (String, HashMap<String, String>)>,
+    test_options: String,
 ) -> Vec<Vec<(String, String, String)>> {
     let se_env = SeEnviroment::from_forge(analyzed_address, signatures, storage_info);
 
-    // TODO(baolean): configure a solver and its timeout
-    let pool = Solvers::Yice {
-        count: CONFIG.read().unwrap().cores,
-        timeout: 10_000,
+    let forge_config: ForgeConfig = serde_json::from_str(&test_options).unwrap();
+
+    let pool = match forge_config.solver {
+        0 => Solvers::Z3 {
+            count: CONFIG.read().unwrap().cores,
+            timeout: usize::try_from(forge_config.solver_timeout).unwrap(),
+        },
+        1 => Solvers::Boolector {
+            count: CONFIG.read().unwrap().cores,
+            timeout: usize::try_from(forge_config.solver_timeout).unwrap(),
+        },
+        2 => Solvers::Yice {
+            count: CONFIG.read().unwrap().cores,
+            timeout: usize::try_from(forge_config.solver_timeout).unwrap(),
+        },
+        _ => panic!("Supplied incorrect solver index"),
     };
+
     {
-        let mut config = CONFIG.write().unwrap();
         // Symexec config
-        config.loop_bound = 5;
-        config.call_depth_limit = 5;
+        let mut config = CONFIG.write().unwrap();
+        config.loop_bound = usize::try_from(forge_config.loop_bound).unwrap();
         // Executing "prove_xxx" functions
-        config.message_bound = 1;
+        config.message_bound = usize::try_from(forge_config.call_bound).unwrap();
+        config.no_verify = !forge_config.concrete_validation;
+        config.symbolic_storage = forge_config.symbolic_storage;
+        // Default values:
+        config.call_depth_limit = 5;
         config.arithmetic_simplification = true;
         // Using concrete calldatacopy
         config.concrete_copy = true;
         config.concrete_load = true;
-        // TODO(baolean): configure
-        config.symbolic_storage = true;
     }
 
     let conf = CONFIG.read().unwrap().clone();
