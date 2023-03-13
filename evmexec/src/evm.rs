@@ -98,7 +98,7 @@ impl Evm {
             .stderr(Redirection::Merge) // redirect err output to stdout
             .stream_stdout()
         {
-            Err(why) => panic!("couldn't spawn evm: {}", why.description()),
+            Err(why) => panic!("couldn't spawn evm: {:?}", why),
             Ok(process) => process,
         };
         // also return the path object to ensure the temporary file does not get dropped until the

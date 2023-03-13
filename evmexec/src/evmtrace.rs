@@ -183,6 +183,9 @@ impl ContextParser {
                 let old_context = Rc::clone(&self.current_addr);
                 self.context.push(Rc::clone(&old_context));
                 self.current_addr = new_current;
+                // Increase the current depth when moving to a new context
+                self.current_depth += 1;
+
                 old_context
             }
             _ => Rc::clone(&self.current_addr),

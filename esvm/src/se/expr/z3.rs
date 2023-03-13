@@ -55,7 +55,7 @@ impl Z3Instance {
             .stderr(Stdio::null())
             .spawn()
         {
-            Err(why) => panic!("couldn't spawn z3: {}", why.description()),
+            Err(why) => panic!("couldn't spawn z3: {:?}", why),
             Ok(process) => process,
         };
 

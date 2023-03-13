@@ -345,8 +345,22 @@ struct CallArgs {
 
 fn args_for_call(state: &mut SeState, call_type: CallType) -> Option<CallArgs> {
     match call_type {
-        CallType::Call | CallType::StaticCall | CallType::CallCode => {
+        CallType::Call | CallType::CallCode => {
             let (gas, to, value, in_off, in_size, out_off, out_size) = state.pop7()?;
+            Some(CallArgs {
+                gas,
+                to,
+                value,
+                in_off,
+                in_size,
+                out_off,
+                out_size,
+            })
+        }
+        CallType::StaticCall => {
+            let (gas, to, in_off, in_size, out_off, out_size) = state.pop6()?;
+            // the `msg.value` is zero in a static call
+            let value = Arc::clone(&zero());
             Some(CallArgs {
                 gas,
                 to,

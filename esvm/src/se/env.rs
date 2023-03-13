@@ -15,7 +15,7 @@ use yaml_rust::Yaml;
 
 lazy_static! {
     pub static ref GLOBAL_COVERAGE_MAP: Mutex<HashMap<AccountId, CodeCoverage>> =
-        { Mutex::new(HashMap::new()) };
+        Mutex::new(HashMap::new());
 }
 
 use crate::disasm::CodeCoverage;

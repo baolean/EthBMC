@@ -560,7 +560,7 @@ impl SeState {
         res
     }
 
-    pub fn pop1(&mut self) -> Option<(BVal)> {
+    pub fn pop1(&mut self) -> Option<BVal> {
         match self.stack.pop() {
             Some(a) => Some(a),
             _ => None,
@@ -751,7 +751,7 @@ pub fn escape_special_chars(val: String, cut: usize) -> String {
 }
 
 lazy_static! {
-    static ref SAT_CACHE: RwLock<HashMap<Vec<BVal>, bool>> = { RwLock::new(HashMap::new()) };
+    static ref SAT_CACHE: RwLock<HashMap<Vec<BVal>, bool>> = RwLock::new(HashMap::new());
 }
 
 fn get_sat_cached_or_insert(
