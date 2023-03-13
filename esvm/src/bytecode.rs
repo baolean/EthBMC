@@ -74,6 +74,7 @@ pub enum Instr {
     IStaticCall,
     ISelfDestruct,
     IInvalid,
+    IChainId,
 }
 
 impl Instr {
