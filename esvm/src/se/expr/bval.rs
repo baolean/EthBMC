@@ -312,7 +312,13 @@ fn lookup_storage_recursive(memory: &SymbolicMemory, node: MVal, addr: &BVal) ->
                 return None;
             }
             match FVal::check_truth(&le(old_addr, addr)) {
-                SymbolicTruth::True => Some(Arc::clone(old_val)),
+                SymbolicTruth::True => {
+                    if old_val.is_some() {
+                        return Some(Arc::clone(&Arc::clone(old_val.as_ref().unwrap())));
+                    } else {
+                        return None;
+                    }
+                }
                 SymbolicTruth::False => lookup_storage_recursive(memory, parent, addr),
                 _ => unreachable!(),
             }
@@ -410,11 +416,13 @@ fn lookup_mem_recursive(memory: &SymbolicMemory, node: MVal, addr: &BVal) -> Opt
             index: ref old_addr,
             value: ref old_val,
         } => {
-            if !(FVal::is_constant(old_addr) && FVal::is_constant(old_val)) {
+            if !(FVal::is_constant(old_addr)
+                && FVal::is_constant(&Arc::clone(old_val.as_ref().unwrap())))
+            {
                 return None;
             }
             match FVal::check_truth(&le(old_addr, addr)) {
-                SymbolicTruth::True => Some(Arc::clone(old_val)),
+                SymbolicTruth::True => Some(Arc::clone(&Arc::clone(old_val.as_ref().unwrap()))),
                 SymbolicTruth::False => lookup_mem_recursive(memory, par, addr),
                 _ => unreachable!(),
             }

@@ -235,12 +235,12 @@ pub struct ExecutionResult {
 }
 
 // I just want a named boolean
-enum Prefixed {
+pub enum Prefixed {
     Yes,
     No,
 }
 
-fn encode(input: &[u8], prefixed: &Prefixed) -> String {
+pub fn encode(input: &[u8], prefixed: &Prefixed) -> String {
     let mut s = String::with_capacity((input.len() * 2) + 2);
     if let Prefixed::Yes = prefixed {
         s.push_str("0x");

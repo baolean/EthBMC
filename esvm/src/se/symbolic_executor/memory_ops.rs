@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use uint::U256;
 
-use crate::se::{
-    env::fresh_var_name,
-    expr::bval::*,
-    expr::symbolic_memory::{self, *},
-    symbolic_edge::*,
-    symbolic_state::{Flags, HaltingReason, SeState},
+use crate::{
+    se::{
+        env::fresh_var_name,
+        expr::bval::*,
+        expr::symbolic_memory::{self, *},
+        symbolic_edge::*,
+        symbolic_state::{Flags, HaltingReason, SeState},
+    },
+    CONFIG,
 };
 
 pub fn code_copy(s: &SeState) -> Vec<(SeState, EdgeType)> {
@@ -217,7 +220,7 @@ pub fn mstore8(s: &SeState) -> Vec<(SeState, EdgeType)> {
     vec![]
 }
 
-fn extract_mapping_key(memory: &SymbolicMemory, val: &BVal) -> Option<BVal> {
+pub fn extract_mapping_key(memory: &SymbolicMemory, val: &BVal) -> Option<BVal> {
     match val.val() {
         Val256::FSHA3(mem, ref offset, ref len) => {
             match (
@@ -286,8 +289,33 @@ pub fn storage_load(s: &SeState) -> Vec<(SeState, EdgeType)> {
                         debug!("Load from mapping: {:?}", key);
                         sload(&s.memory, *mem, addr)
                     } else {
-                        debug!("Mapping never writen to, returning zero!");
-                        zero()
+                        debug!("Mapping never writen to");
+                        if s.config().symbolic_storage {
+                            let entry_key;
+                            {
+                                let mem = symbolic_memory::create_new_memory(
+                                    Arc::make_mut(&mut res.memory),
+                                    fresh_var_name("mapping"),
+                                    MemoryType::Storage,
+                                    None,
+                                    Some(res.account),
+                                );
+                                let mapping = Arc::make_mut(&mut res.account_mut().mappings);
+                                entry_key = *mapping.entry(key.clone()).or_insert_with(|| mem);
+                            }
+
+                            let write = memset_unlimited(
+                                Arc::make_mut(&mut res.memory),
+                                entry_key,
+                                &addr,
+                                None,
+                            );
+                            Arc::make_mut(&mut res.account_mut().mappings).insert(key, write);
+
+                            sload(&res.memory, entry_key, addr)
+                        } else {
+                            zero()
+                        }
                     }
                 }
             } else {
@@ -344,6 +372,7 @@ pub fn sstore(s: &SeState) -> Vec<(SeState, EdgeType)> {
                             fresh_var_name("mapping"),
                             MemoryType::Storage,
                             None,
+                            Some(res.account),
                         );
                         let mapping = Arc::make_mut(&mut res.account_mut().mappings);
                         entry_key = *mapping.entry(key.clone()).or_insert_with(|| mem);
@@ -425,6 +454,7 @@ pub fn set_returndata(s: &mut SeState, addr: &BVal, size: &BVal) {
         name,
         MemoryType::Data,
         Some(size.clone()),
+        None,
     );
     returndata = memcopy(
         Arc::make_mut(&mut s.memory),
@@ -477,6 +507,7 @@ mod tests {
             format!("{}_mem_1", state.account().name.clone()),
             MemoryType::Memory,
             None,
+            None,
         );
         correct_mem = word_write(&mut memory, correct_mem, store_addr, &const_usize(0x01));
 
@@ -512,6 +543,7 @@ mod tests {
             format!("{}_data", state.input_tx().name.clone()),
             MemoryType::Data,
             Some(state.input_tx().calldata_size.clone()),
+            None,
         );
         let correct_bval = mload(&memory, correct_data, &store_addr);
 
@@ -550,6 +582,7 @@ mod tests {
             format!("{}_returndata", state.account().name),
             MemoryType::Data,
             Some(const_usize(0x41414141)),
+            None,
         );
         returndata = memcopy(
             &mut memory,

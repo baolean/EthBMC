@@ -870,6 +870,7 @@ impl Transaction {
             format!("{}_data", name),
             MemoryType::Data,
             Some(calldata_size.clone()),
+            None,
         );
         let constraints = vec![];
         Transaction {
@@ -981,6 +982,7 @@ impl Account {
             format!("{}_storage", name),
             MemoryType::Storage,
             None,
+            Some(id),
         );
         let constraints = vec![];
         let selfdestruct = false;
@@ -1154,6 +1156,7 @@ victim: 0x780771f6a176a937e45d491d180df424d9e15fa6";
             &mut memory,
             format!("{}_storage", vic.name.clone()),
             MemoryType::Storage,
+            None,
             None,
         );
         storage = word_write(

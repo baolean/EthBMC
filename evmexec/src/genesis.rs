@@ -202,7 +202,7 @@ impl Genesis {
         let account = self
             .alloc
             .get_mut(account)
-            .ok_or_else(|| crate::Error::custom("Trying to update unknown accout".to_string()))?;
+            .ok_or_else(|| crate::Error::custom("Trying to update unknown account".to_string()))?;
         account.storage.insert(addr, value);
         Ok(())
     }

@@ -197,6 +197,7 @@ impl SeState {
             fresh_var_name(&format!("{}_mem", env.get_account(&account).name)),
             MemoryType::Memory,
             None,
+            None,
         );
         let id = context.next_id();
 
@@ -1023,11 +1024,16 @@ impl ConstraintSetSplitter {
         constraints
     }
 
-    fn explore_bval(&mut self, parent_key: TrackingKey, memory: &SymbolicMemory, var: &BVal) {
-        let (explored, key) = self.get_or_create_key(TrackingVariable::bval(var));
+    fn explore_bval(
+        &mut self,
+        parent_key: TrackingKey,
+        memory: &SymbolicMemory,
+        var: Option<&BVal>,
+    ) {
+        let (explored, key) = self.get_or_create_key(TrackingVariable::bval(var.unwrap()));
         self.ut.union(parent_key, key);
         if !explored {
-            self.process_bval(parent_key, memory, var);
+            self.process_bval(parent_key, memory, var.unwrap());
         }
     }
 
@@ -1052,8 +1058,8 @@ impl ConstraintSetSplitter {
                 address: ref addr,
                 value: ref val,
             } => {
-                self.explore_bval(parent_key, memory, addr);
-                self.explore_bval(parent_key, memory, val);
+                self.explore_bval(parent_key, memory, Some(addr));
+                self.explore_bval(parent_key, memory, Some(val));
                 self.explore_mval(parent_key, memory, *id);
             }
             MemoryOperation::Memset {
@@ -1062,9 +1068,9 @@ impl ConstraintSetSplitter {
                 size: ref length,
                 value: ref val,
             } => {
-                self.explore_bval(parent_key, memory, from);
-                self.explore_bval(parent_key, memory, val);
-                self.explore_bval(parent_key, memory, length);
+                self.explore_bval(parent_key, memory, Some(from));
+                self.explore_bval(parent_key, memory, Some(val));
+                self.explore_bval(parent_key, memory, Some(length));
                 self.explore_mval(parent_key, memory, *id);
             }
             MemoryOperation::MemsetUnlimited {
@@ -1072,8 +1078,12 @@ impl ConstraintSetSplitter {
                 index: ref from,
                 value: ref val,
             } => {
-                self.explore_bval(parent_key, memory, from);
-                self.explore_bval(parent_key, memory, val);
+                self.explore_bval(parent_key, memory, Some(from));
+                self.explore_bval(
+                    parent_key,
+                    memory,
+                    Some(&Arc::clone(&val.as_ref().unwrap_or(&zero()))),
+                );
                 self.explore_mval(parent_key, memory, *id);
             }
             MemoryOperation::Memcopy {
@@ -1083,9 +1093,9 @@ impl ConstraintSetSplitter {
                 index_from: ref from_index,
                 size: ref length,
             } => {
-                self.explore_bval(parent_key, memory, from_index);
-                self.explore_bval(parent_key, memory, to_index);
-                self.explore_bval(parent_key, memory, length);
+                self.explore_bval(parent_key, memory, Some(from_index));
+                self.explore_bval(parent_key, memory, Some(to_index));
+                self.explore_bval(parent_key, memory, Some(length));
                 self.explore_mval(parent_key, memory, *to);
                 self.explore_mval(parent_key, memory, *from);
             }
@@ -1095,8 +1105,8 @@ impl ConstraintSetSplitter {
                 index: ref to_index,
                 index_from: ref from_index,
             } => {
-                self.explore_bval(parent_key, memory, from_index);
-                self.explore_bval(parent_key, memory, to_index);
+                self.explore_bval(parent_key, memory, Some(from_index));
+                self.explore_bval(parent_key, memory, Some(to_index));
                 self.explore_mval(parent_key, memory, *to);
                 self.explore_mval(parent_key, memory, *from);
             }
@@ -1128,28 +1138,28 @@ impl ConstraintSetSplitter {
             | Val256::FAShr(ref l, ref r)
             | Val256::FLShr(ref l, ref r)
             | Val256::FShl(ref l, ref r) => {
-                self.explore_bval(parent_key, memory, l);
-                self.explore_bval(parent_key, memory, r);
+                self.explore_bval(parent_key, memory, Some(l));
+                self.explore_bval(parent_key, memory, Some(r));
             }
-            Val256::FNot(ref v) => self.explore_bval(parent_key, memory, v),
+            Val256::FNot(ref v) => self.explore_bval(parent_key, memory, Some(v)),
             Val256::FITE(ref c, ref t, ref e) => {
-                self.explore_bval(parent_key, memory, c);
-                self.explore_bval(parent_key, memory, t);
-                self.explore_bval(parent_key, memory, e);
+                self.explore_bval(parent_key, memory, Some(c));
+                self.explore_bval(parent_key, memory, Some(t));
+                self.explore_bval(parent_key, memory, Some(e));
             }
             Val256::FMLoad(mem, ref addr) | Val256::FSLoad(mem, ref addr) => {
                 self.explore_mval(parent_key, memory, *mem);
-                self.explore_bval(parent_key, memory, addr);
+                self.explore_bval(parent_key, memory, Some(addr));
             }
             Val256::FCombine32(ref loads) => {
                 for load in loads {
-                    self.explore_bval(parent_key, memory, load);
+                    self.explore_bval(parent_key, memory, Some(load));
                 }
             }
             Val256::FSHA3(mem, ref offset, ref len) => {
                 self.explore_mval(parent_key, memory, *mem);
-                self.explore_bval(parent_key, memory, offset);
-                self.explore_bval(parent_key, memory, len);
+                self.explore_bval(parent_key, memory, Some(offset));
+                self.explore_bval(parent_key, memory, Some(len));
             }
             // nothing to do here, allready added the value in the previous interation
             Val256::FConst(_) | Val256::FConst8(_) | Val256::FVarRef(_) => {}
@@ -1250,12 +1260,14 @@ mod tests {
             "test_1".to_string(),
             MemoryType::Storage,
             None,
+            None,
         );
         let load_1 = sload(&memory, mem_1, &var("var_1"));
         let mem_2 = symbolic_memory::create_new_memory(
             &mut memory,
             "test_2".to_string(),
             MemoryType::Storage,
+            None,
             None,
         );
         let mem_2 = word_write(&mut memory, mem_2, &load_1, &const_usize(0x0));
@@ -1285,12 +1297,14 @@ mod tests {
             "test_1".to_string(),
             MemoryType::Storage,
             None,
+            None,
         );
         let load_1 = sload(&memory, mem_1, &var("var_1"));
         let mem_2 = symbolic_memory::create_new_memory(
             &mut memory,
             "test_2".to_string(),
             MemoryType::Storage,
+            None,
             None,
         );
         let mem_2 = word_write(&mut memory, mem_2, &load_1, &const_usize(0x0));

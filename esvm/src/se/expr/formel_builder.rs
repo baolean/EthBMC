@@ -391,7 +391,11 @@ impl<'a> SmtLib2Builder<'a> {
                     for r in reads {
                         let load = self.to_smt(&sload(self.memory, current_node, &r));
                         let ite_load = sload(self.memory, par, &r);
-                        let ite = self.to_smt(&ite(&le(waddr, &r), val, &ite_load));
+                        let ite = self.to_smt(&ite(
+                            &le(waddr, &r),
+                            &Arc::clone(&val.as_ref().unwrap_or(&zero())),
+                            &ite_load,
+                        ));
 
                         self.assert(&format!("(= {} {})", &load, &ite));
                     }
@@ -498,8 +502,11 @@ impl<'a> SmtLib2Builder<'a> {
                 for r in reads {
                     let load = self.to_smt(&mload8(self.memory, node, &r));
                     let ite_load = mload8(self.memory, par, &r);
-                    let ite =
-                        self.to_smt(&ite(&le(waddr, &r), &byte_extract(val, &zero()), &ite_load));
+                    let ite = self.to_smt(&ite(
+                        &le(waddr, &r),
+                        &byte_extract(&Arc::clone(val.as_ref().unwrap()), &zero()),
+                        &ite_load,
+                    ));
 
                     self.assert(&format!("(= {} {})", &load, &ite));
                 }
@@ -714,6 +721,7 @@ mod tests {
             Arc::make_mut(&mut state.memory),
             "test_memory".to_string(),
             MemoryType::Memory,
+            None,
             None,
         );
         let mem = word_write(

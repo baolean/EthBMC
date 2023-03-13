@@ -59,7 +59,9 @@ FLAGS:
         --json                Output json without logging
         --list                The input is a list of Ethereum account address, writes the result to a csv file in the
                               output folder
-        --no-verify           Skip verification phase.
+        --no-verify           Skip verification phase
+        --symbolic-storage    Use symbolic storage mode
+
     -V, --version             Prints version information
 
 OPTIONS:

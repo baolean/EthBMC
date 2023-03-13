@@ -10,7 +10,7 @@ use std::{
 
 use ethereum_newtypes::{Address, Bytes, Hash, WU256};
 use evmexec::{
-    evm::{Evm, EvmInput},
+    evm::{encode, Evm, EvmInput, Prefixed},
     evmtrace::Instruction,
     genesis,
 };
@@ -26,7 +26,7 @@ use crate::se::{
     expr::{
         bval::*,
         solver::{create_pool, SolverPool, Solvers},
-        symbolic_memory::{MVal, SymbolicMemory},
+        symbolic_memory::{MVal, MemoryType, SymbolicMemory},
     },
     symbolic_graph::SymbolicGraph,
     symbolic_state::{Flags, HaltingReason, ResultState, SeState},
@@ -35,6 +35,8 @@ use crate::{LoadedAccount, PrecompiledContracts};
 
 #[cfg(test)]
 use crate::se::expr::symbolic_memory::{self, MemoryType};
+
+use super::symbolic_executor::memory_ops::extract_mapping_key;
 
 lazy_static! {
     pub static ref CONFIG: RwLock<SeConfig> = RwLock::new(SeConfig::new());
@@ -80,6 +82,9 @@ pub struct SeConfig {
     /// Disable the verification phase
     pub no_verify: bool,
 
+    /// Use symbolic storage mode
+    pub symbolic_storage: bool,
+
     /// Dump solver queries
     pub dump_solver: bool,
 
@@ -118,6 +123,7 @@ impl SeConfig {
             message_bound: 5,
             dgraph: false,
             no_verify: false,
+            symbolic_storage: false,
             dump_solver: false,
             solver_timeout: 120_000,
             parity: None,
@@ -165,6 +171,7 @@ impl Context {
             &mut memory,
             "test".to_string(),
             MemoryType::Storage,
+            None,
             None,
         );
         Self::new(
@@ -468,6 +475,16 @@ impl Analysis {
                             .verify_tx_assert(&potential_attack_state, &data)
                             .is_some()
                         {
+                            if potential_attack_state.config().symbolic_storage {
+                                println!("\nConcretized storage:");
+                                for upd in data[0].storage_upd.iter() {
+                                    println!(
+                                        "Account: {:#x} \n {:#x}: {:#x}",
+                                        upd.account, upd.addr, upd.value
+                                    );
+                                }
+                            }
+
                             let attack = Attack {
                                 txs: data,
                                 attack_type: AttackType::AssertFailed,
@@ -641,7 +658,14 @@ impl Analysis {
         state: &SeState,
         attack_data: &[TxData],
     ) -> Option<evmexec::evm::Execution> {
-        let genesis: genesis::Genesis = (*state.env).clone().into();
+        let mut genesis: genesis::Genesis = (*state.env).clone().into();
+        // Updating geth genesis w/ counterexample generated values
+        if state.context.config().symbolic_storage {
+            for upd in attack_data[0].storage_upd.iter() {
+                genesis.update_account_storage(&upd.account, upd.addr.clone(), upd.value.clone());
+            }
+        }
+
         let mut evm: Evm = genesis.into();
         let sender: Address = BitVec::as_bigint(&state.env.get_account(&self.from).addr)
             .unwrap()
@@ -655,9 +679,10 @@ impl Analysis {
             i,
             TxData {
                 balance,
-                input_data,
                 number,
                 timestamp,
+                input_data,
+                storage_upd: _,
             },
         ) in attack_data.iter().enumerate()
         {
@@ -670,7 +695,6 @@ impl Analysis {
                 evm.genesis.number = BitVec::as_bigint(&block.number).unwrap().into();
                 evm.genesis.gas_limit = BitVec::as_bigint(&block.gas_limit).unwrap().into();
             } else {
-                // Set block.number and timestamp based on the conretized values
                 evm.genesis.number = number.clone();
                 evm.genesis.timestamp = timestamp.clone();
             }
@@ -808,7 +832,78 @@ impl Analysis {
         let timestamp = load_state.get_value(&load_state.env.latest_block().timestamp)?;
         let number = load_state.get_value(&load_state.env.latest_block().number)?;
 
-        tx_data_from_bval_vec(balance, number, timestamp, res)
+        let mut storage_updates: Vec<StorageUpdate> = Vec::new();
+
+        // TODO(baolean): concretizing symbolic storage for counterexample validation
+        if s.config().symbolic_storage {
+            for read in load_state.reads.iter() {
+                if load_state.memory[*read.0].memory_type == MemoryType::Storage {
+                    for op in read.1 {
+                        match op.val().clone() {
+                            // For every storage variable that was read from:
+                            Val256::FSLoad(node_index, addr) => {
+                                let account_id = load_state.memory[node_index].account_id.unwrap();
+                                // Get the value it should be set to
+                                let value = load_state.get_value(op)?;
+
+                                // Get the address of the account/contract it belongs to
+                                let account_addr: Address = BitVec::as_bigint(
+                                    &load_state.env.get_account(&account_id).addr,
+                                )
+                                .unwrap()
+                                .into();
+
+                                // If the location we're writing to is a mapping entry,
+                                if let Val256::FSHA3(mem, offset, _len) = &addr.val().clone() {
+                                    // Get the storage slot that corresponds to the mapping
+                                    let mapping_key =
+                                        extract_mapping_key(&load_state.memory, &addr);
+
+                                    // Get the index of the entry we're writing to
+                                    // TODO(baolean): get only the necessary (40) bytes according to `len`
+                                    let index = load_state.get_value(&mload(
+                                        &load_state.memory,
+                                        *mem,
+                                        offset,
+                                    ))?;
+
+                                    // Convert the values of the index and storage slot to bytes
+                                    let key = Hash(FVal::as_bigint(&index).unwrap());
+                                    let slot =
+                                        Hash(FVal::as_bigint(&mapping_key.unwrap()).unwrap());
+
+                                    // Get the location of the mapping entry as `keccak256(abi.encode(key, slot))`
+                                    let hashed_location = tiny_keccak::keccak256(
+                                        convert_data_to_bytes(vec![key, slot]).as_slice(),
+                                    );
+
+                                    let record = StorageUpdate {
+                                        account: account_addr,
+                                        addr: encode(&hashed_location, &Prefixed::No)
+                                            .as_str()
+                                            .into(),
+                                        value: FVal::as_bigint(&value)?.into(),
+                                    };
+
+                                    storage_updates.push(record);
+                                } else {
+                                    let record = StorageUpdate {
+                                        account: account_addr,
+                                        addr: FVal::as_bigint(&addr)?.into(),
+                                        value: FVal::as_bigint(&value)?.into(),
+                                    };
+
+                                    storage_updates.push(record);
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+            }
+        }
+
+        tx_data_from_bval_vec(balance, number, timestamp, res, storage_updates)
     }
 
     pub fn dump_debug_graph(mut self) {
@@ -892,11 +987,19 @@ impl fmt::Display for Attack {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct StorageUpdate {
+    pub account: Address,
+    pub addr: WU256,
+    pub value: WU256,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TxData {
     pub balance: WU256,
     pub number: WU256,
     pub timestamp: WU256,
     pub input_data: Vec<Hash>,
+    pub storage_upd: Vec<StorageUpdate>,
 }
 
 fn convert_data_to_bytes(data: Vec<Hash>) -> Bytes {
@@ -915,6 +1018,7 @@ fn tx_data_from_bval_vec(
     number: BVal,
     timestamp: BVal,
     data: Vec<BVal>,
+    storage_upd: Vec<StorageUpdate>,
 ) -> Option<TxData> {
     let balance = FVal::as_bigint(&balance)?.into();
     let number = FVal::as_bigint(&number)?.into();
@@ -928,6 +1032,7 @@ fn tx_data_from_bval_vec(
         number,
         timestamp,
         input_data: res,
+        storage_upd,
     })
 }
 

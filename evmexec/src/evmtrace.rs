@@ -32,6 +32,12 @@ fn parse_trace_line_with_depth(line: &str) -> Option<ParsedTraceLine> {
     if let Some(cap) = GETH_RE.captures(line) {
         let instruction = match cap["op"].parse::<usize>().ok()? {
             // https://github.com/trailofbits/evm-opcodes or yellowpaper
+            0x54 => {
+                let mut stack = parse_stack(&cap["stack"]);
+                debug_assert!(stack.len() >= 1);
+                let addr = stack.pop().unwrap();
+                Some(Instruction::SLoad { addr })
+            }
             0x55 => {
                 let mut stack = parse_stack(&cap["stack"]);
                 debug_assert!(stack.len() >= 2);
@@ -209,6 +215,9 @@ pub enum Instruction {
     SStore {
         addr: WU256,
         value: WU256,
+    },
+    SLoad {
+        addr: WU256,
     },
     Call {
         gas: WU256,

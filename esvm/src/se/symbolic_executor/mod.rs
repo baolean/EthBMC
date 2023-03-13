@@ -1,6 +1,6 @@
 mod call_ops;
 mod executor;
-mod memory_ops;
+pub mod memory_ops;
 mod stack_ops;
 
 pub use self::executor::*;
