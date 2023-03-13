@@ -458,6 +458,32 @@ impl Analysis {
         mut potential_attack_state: SeState,
         result: &Mutex<Vec<Attack>>,
     ) {
+        match potential_attack_state.halting_reason {
+            Some(HaltingReason::Invalid) | Some(HaltingReason::Revert) => {
+                if potential_attack_state.failed_assert {
+                    info!("An assert might be violated!");
+
+                    if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
+                        if self
+                            .verify_tx_assert(&potential_attack_state, &data)
+                            .is_some()
+                        {
+                            let attack = Attack {
+                                txs: data,
+                                attack_type: AttackType::AssertFailed,
+                            };
+                            result.lock().unwrap().push(attack);
+                        }
+                    } else {
+                        println!(
+                            "Found attack, {}, but could not generate tx data!",
+                            AttackType::AssertFailed
+                        );
+                    }
+                }
+            }
+            _ => {}
+        };
         let initial_state = &self.graph.initial_state();
         let attacker = &self.from;
         // if we know the owner variable of the vicitm account check if we changed it
@@ -735,6 +761,31 @@ impl Analysis {
         None
     }
 
+    fn verify_tx_assert(&self, state: &SeState, attack_data: &[TxData]) -> Option<()> {
+        if state.context.config().no_verify {
+            return Some(());
+        }
+
+        let evm = self.execute_concrete_evm(state, attack_data)?;
+        for ins in evm.result.ok()?.trace {
+            match ins.instruction {
+                Instruction::Revert { panic, .. } => {
+                    if panic == WU256::from(U256::from(0x01)) {
+                        return Some(());
+                    }
+                }
+                Instruction::Invalid {} => return Some(()),
+                Instruction::SStore { addr, value } => {
+                    if addr == WU256::from(0) && value == WU256::from(256) {
+                        return Some(());
+                    }
+                }
+                _ => (),
+            }
+        }
+        None
+    }
+
     fn concrete_input_data_for_tx(&self, s: &SeState, tx: &TxId) -> Option<TxData> {
         let mut load_state = s.clone();
         let mut loads = Vec::with_capacity(5);
@@ -877,6 +928,7 @@ pub enum AttackType {
     HijackControlFlow,
     Reentrancy,
     CanChangeOwner,
+    AssertFailed,
 }
 
 impl fmt::Display for AttackType {
@@ -891,6 +943,7 @@ impl fmt::Display for AttackType {
             }
             AttackType::Reentrancy => write!(f, "can trigger reentrancy"),
             AttackType::CanChangeOwner => write!(f, "can change owner variable as attacker"),
+            AttackType::AssertFailed => write!(f, "an assertion can be violated"),
         }
     }
 }

@@ -448,10 +448,11 @@ fn create_return_state(
 
     // clone return data if available and set callres constraint
     match end_state.halting_reason {
-        Some(HaltingReason::Revert) => {
+        Some(HaltingReason::Revert | HaltingReason::Invalid) => {
             return_state.push_constraint(eql(&callres_execution, &zero()));
             return_state.returndata = end_state.returndata;
             return_state.returndata_size = end_state.returndata_size;
+            return_state.failed_assert = end_state.failed_assert;
             return_state.mem = memcopy(
                 Arc::make_mut(&mut memory),
                 s.mem,

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use uint::U256;
+
 use crate::se::{
     env::fresh_var_name,
     expr::bval::*,
@@ -373,6 +375,31 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
         res.halting_reason = Some(HaltingReason::Revert);
         res.revert_state_changes();
 
+        let loaded_returndata =
+            FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();
+
+        // Detecting failed asserts in solc >= 0.8 based on returndata
+        if loaded_returndata
+            == U256::from_dec_str(
+                // 0x4e487b710
+                "35408467139433450592217433187231851964531694900788300625387963629091585785856",
+            )
+            .unwrap()
+        {
+            res.failed_assert = true;
+        }
+        return vec![(res, edge_terminal())];
+    }
+    vec![]
+}
+
+pub fn invalid(s: &SeState) -> Vec<(SeState, EdgeType)> {
+    let mut res = s.create_succ();
+    if let Some((addr, size)) = res.pop2() {
+        set_returndata(&mut res, &addr, &size);
+        res.halting_reason = Some(HaltingReason::Invalid);
+        res.revert_state_changes();
+        res.failed_assert = true;
         return vec![(res, edge_terminal())];
     }
     vec![]

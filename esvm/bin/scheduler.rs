@@ -1,11 +1,11 @@
 extern crate clap;
 extern crate esvm;
-extern crate fern;
 extern crate ethereum_newtypes;
+extern crate fern;
+extern crate hexdecode;
 extern crate rayon;
 extern crate regex;
 extern crate reqwest;
-extern crate hexdecode;
 extern crate serde_json;
 
 #[macro_use]
@@ -23,14 +23,14 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-use esvm::{AttackType, TimeoutAnalysis, AnalysisSuccess};
+use esvm::{AnalysisSuccess, AttackType, TimeoutAnalysis};
 
-use serde_json::json;
 use chrono::prelude::Local;
 use clap::{App, Arg, ArgMatches};
-use ethereum_newtypes::{Address};
+use ethereum_newtypes::Address;
 use regex::Regex;
 use reqwest::Client;
+use serde_json::json;
 
 fn init_logger() -> Result<()> {
     fern::Dispatch::new()
@@ -79,19 +79,17 @@ impl Worker {
     fn analyze(&self, address: Address) -> Result<AnalysisSuccess> {
         info!("Analyzing {:x}", address.0);
         let mut res = if self.timeout > Duration::from_secs(0) {
-            self
-            .client
-            .post(&self.url)
-            .json(&TimeoutAnalysis { address, timeout: self.timeout})
-            .send()?
+            self.client
+                .post(&self.url)
+                .json(&TimeoutAnalysis {
+                    address,
+                    timeout: self.timeout,
+                })
+                .send()?
         } else {
-            self
-            .client
-            .post(&self.url)
-            .json(&address)
-            .send()?
+            self.client.post(&self.url).json(&address).send()?
         };
-         Ok(res.json()?)
+        Ok(res.json()?)
     }
 
     fn check_alive(&self) -> Result<()> {
@@ -156,7 +154,10 @@ impl Scheduler {
     fn with_worker_count(urls: Vec<String>, timeout: usize) -> Self {
         let s = Scheduler::new();
         for url in &urls {
-            s.queue.lock().unwrap().push(Worker::new(url, timeout).unwrap()); // if the workers can not connect initially fail
+            s.queue
+                .lock()
+                .unwrap()
+                .push(Worker::new(url, timeout).unwrap()); // if the workers can not connect initially fail
         }
         s
     }
@@ -196,9 +197,7 @@ impl Error {
     }
 
     fn retry() -> Self {
-        Self {
-            kind: Kind::Retry,
-        }
+        Self { kind: Kind::Retry }
     }
 
     fn kind(&self) -> &Kind {
@@ -241,7 +240,7 @@ enum Kind {
     SerdeJson(serde_json::Error),
     Log(log::SetLoggerError),
     IO(std::io::Error),
-    Execution(String), ; 
+    Execution(String), ;
     Retry,
 });
 
@@ -259,8 +258,17 @@ fn parse_args<'a>() -> ArgMatches<'a> {
                 .required(true)
                 .index(2),
         )
-        .arg(Arg::with_name("timeout").long("timeout").takes_value(true).help("Specify a timeout for the analysis, none used by default"))
-        .arg(Arg::with_name("json").long("json").help("Dump the analysis result in json format."))
+        .arg(
+            Arg::with_name("timeout")
+                .long("timeout")
+                .takes_value(true)
+                .help("Specify a timeout for the analysis, none used by default"),
+        )
+        .arg(
+            Arg::with_name("json")
+                .long("json")
+                .help("Dump the analysis result in json format."),
+        )
         .get_matches()
 }
 
@@ -333,7 +341,12 @@ fn execute(
             continue;
         }
 
-        let a = Address(hexdecode::decode(&acc.as_bytes()).unwrap().as_slice().into());
+        let a = Address(
+            hexdecode::decode(&acc.as_bytes())
+                .unwrap()
+                .as_slice()
+                .into(),
+        );
         let worker = scheduler.get_worker();
         let res = worker.analyze(a);
 
@@ -356,28 +369,39 @@ fn execute(
                 };
                 if json {
                     if let AnalysisSuccess::Success(ref analysis) = r {
-                            let mut res = (false, false, false);
-                            if let Some(ref attacks) = analysis.attacks {
-                                for attack in attacks {
-                                    if attack.attack_type == AttackType::StealMoney {
-                                        res.0 = true;
-                                    }
-                                    if attack.attack_type == AttackType::DeleteContract {
-                                        res.1 = true;
-                                    }
-                                    if attack.attack_type == AttackType::HijackControlFlow {
-                                        res.2 = true;
-                                    }
+                        let mut res = (false, false, false, false);
+                        if let Some(ref attacks) = analysis.attacks {
+                            for attack in attacks {
+                                if attack.attack_type == AttackType::StealMoney {
+                                    res.0 = true;
+                                }
+                                if attack.attack_type == AttackType::DeleteContract {
+                                    res.1 = true;
+                                }
+                                if attack.attack_type == AttackType::HijackControlFlow {
+                                    res.2 = true;
+                                }
+                                if attack.attack_type == AttackType::AssertFailed {
+                                    res.3 = true;
                                 }
                             }
-                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2).as_bytes()).expect("Could not write to csv file!");
-
+                        }
+                        csv.lock()
+                            .unwrap()
+                            .write_all(
+                                format!(
+                                    "{:x}, {}, {}, {}, {}\n",
+                                    analysis.address, res.0, res.1, res.2, res.3
+                                )
+                                .as_bytes(),
+                            )
+                            .expect("Could not write to csv file!");
                     }
                     let _write_res = f.write_all(json!(r).to_string().as_bytes());
                 } else {
                     let content = match r {
                         AnalysisSuccess::Success(analysis) => {
-                            let mut res = (false, false, false);
+                            let mut res = (false, false, false, false);
                             if let Some(ref attacks) = analysis.attacks {
                                 for attack in attacks {
                                     if attack.attack_type == AttackType::StealMoney {
@@ -389,20 +413,32 @@ fn execute(
                                     if attack.attack_type == AttackType::HijackControlFlow {
                                         res.2 = true;
                                     }
+                                    if attack.attack_type == AttackType::AssertFailed {
+                                        res.3 = true;
+                                    }
                                 }
                             }
-                            csv.lock().unwrap().write_all(format!("{:x}, {}, {}, {}\n", analysis.address, res.0, res.1, res.2).as_bytes()).expect("Could not write to csv file!");
+                            csv.lock()
+                                .unwrap()
+                                .write_all(
+                                    format!(
+                                        "{:x}, {}, {}, {}, {}\n",
+                                        analysis.address, res.0, res.1, res.2, res.3
+                                    )
+                                    .as_bytes(),
+                                )
+                                .expect("Could not write to csv file!");
 
                             format!("{}", analysis)
-                        },
+                        }
                         AnalysisSuccess::Failure(s) => {
                             warn!("Failure during analysing {}: {}", acc, s);
                             s
-                        },
+                        }
                         AnalysisSuccess::Timeout => {
                             warn!("Timeout during analysis: {:?}", acc);
                             format!("Timeout analysing {:?}", acc)
-                        },
+                        }
                     };
                     let _write_res = f.write_all(content.as_bytes());
                 }
@@ -410,7 +446,7 @@ fn execute(
             Err(e) => {
                 if let Kind::Retry = e.kind() {
                     error!("Error analyzing {}, retrying...", acc);
-                    work_stack.lock().unwrap().push((c+1, acc));
+                    work_stack.lock().unwrap().push((c + 1, acc));
                 } else {
                     error!("Error analyzing {}: {:?} worker died!", acc, e);
                 }
@@ -452,9 +488,11 @@ fn main() {
 
     let scheduler = Arc::new(Scheduler::with_worker_count(server_list, timeout));
     let counter = Arc::new(AtomicUsize::new(1));
-    
-    let mut f = File::create(format!("{}/analysis.csv", root_path)).expect("Could not create csv file!");
-    f.write_all("address, steal ether, trigger suicide, hijack control flow\n".as_bytes()).expect("Could not write header to cvs!");
+
+    let mut f =
+        File::create(format!("{}/analysis.csv", root_path)).expect("Could not create csv file!");
+    f.write_all("address, steal ether, trigger suicide, hijack control flow\n".as_bytes())
+        .expect("Could not write header to cvs!");
     let csv_writer = Arc::new(Mutex::new(BufWriter::new(f)));
 
     info!("Starting Analysis");
@@ -479,7 +517,11 @@ fn main() {
         });
         threads.push(join_handle);
     }
-    csv_writer.lock().unwrap().flush().expect("Could not finally flush writer");
+    csv_writer
+        .lock()
+        .unwrap()
+        .flush()
+        .expect("Could not finally flush writer");
 
     for handle in threads {
         let _res = handle.join();

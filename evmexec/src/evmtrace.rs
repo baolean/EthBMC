@@ -3,6 +3,7 @@ use std::rc::Rc;
 use regex::Regex;
 
 use ethereum_newtypes::{Address, WU256};
+use uint::U256;
 
 lazy_static! {
     static ref GETH_RE: Regex = Regex::new(r#"\{"pc":(?P<pc>\d+).*,"op":(?P<op>\d+),.*"memory":"(?P<memory>0x[[:xdigit:]]*)".*"stack":(?P<stack>\[[0-9a-zA-Z",]*\]).*,"depth":(?P<depth>\d+).*\}"#).unwrap();
@@ -122,6 +123,20 @@ fn parse_trace_line_with_depth(line: &str) -> Option<ParsedTraceLine> {
                 let receiver = stack.pop().unwrap();
                 Some(Instruction::Selfdestruct { receiver })
             }
+            0xfd => {
+                let memory = &cap["memory"];
+                if memory.contains(
+                    "0x4e487b710000000000000000000000000000000000000000000000000000000000000001",
+                ) {
+                    let assert_code: U256 = 0x01.into();
+                    Some(Instruction::Revert {
+                        panic: WU256(assert_code),
+                    })
+                } else {
+                    None
+                }
+            }
+            0xfe => Some(Instruction::Invalid {}),
             _ => None,
         }?;
         let depth = cap["depth"].parse::<u16>().ok()?;
@@ -230,6 +245,10 @@ pub enum Instruction {
     Selfdestruct {
         receiver: WU256,
     },
+    Revert {
+        panic: WU256,
+    },
+    Invalid {},
 }
 
 #[cfg(test)]

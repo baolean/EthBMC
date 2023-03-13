@@ -109,7 +109,7 @@ pub fn symbolic_step(s: &SeState) -> Vec<(SeState, EdgeType)> {
         Instr::IStop => stop(s),
         Instr::IRevert => revert(s),
         Instr::IReturn => ireturn(s),
-        Instr::IInvalid => vec![], // execution reached invalid state, drop path
+        Instr::IInvalid => invalid(s),
         Instr::ICodeCopy => code_copy(s),
         Instr::IRDataSize => returndata_size(s),
         Instr::IRDataCopy => returndata_copy(s),

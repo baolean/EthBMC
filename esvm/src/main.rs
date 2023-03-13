@@ -141,10 +141,10 @@ fn dump_result(results: Vec<(String, Option<Vec<Attack>>)>) {
     let mut content = String::new();
 
     // preamble
-    content.push_str("address, steal ether, trigger suicide, hijack control flow\n");
+    content.push_str("address, steal ether, trigger suicide, hijack control flow, failed assert\n");
 
     for (acc, attacks) in &results {
-        let mut res = (false, false, false);
+        let mut res = (false, false, false, false);
         if let Some(attacks) = attacks {
             for attack in attacks {
                 if attack.attack_type == AttackType::StealMoney {
@@ -155,6 +155,9 @@ fn dump_result(results: Vec<(String, Option<Vec<Attack>>)>) {
                 }
                 if attack.attack_type == AttackType::HijackControlFlow {
                     res.2 = true;
+                }
+                if attack.attack_type == AttackType::AssertFailed {
+                    res.3 = true;
                 }
             }
         }

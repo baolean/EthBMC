@@ -21,6 +21,10 @@ pub struct Config {
     pub dao_fork_block: u32,
     pub byzantium_block: u32,
     pub constantinople_block: u32,
+    pub petersburg_block: u32,
+    pub istanbul_block: u32,
+    pub london_block: u32,
+    pub berlin_block: u32,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -81,14 +85,18 @@ impl Account {
 }
 
 impl Config {
-    pub fn byzantium() -> Self {
+    pub fn london() -> Self {
         let eip150_block = 0;
         let eip158_block = 0;
         let eip155_block = 0;
         let homestead_block = 0;
         let dao_fork_block = 0;
-        let byzantium_block = 2000;
-        let constantinople_block = 2000;
+        let byzantium_block = 0;
+        let constantinople_block = 0;
+        let petersburg_block = 0;
+        let istanbul_block = 0;
+        let berlin_block = 0;
+        let london_block = 0;
 
         Self {
             eip150_block,
@@ -98,6 +106,10 @@ impl Config {
             dao_fork_block,
             byzantium_block,
             constantinople_block,
+            petersburg_block,
+            istanbul_block,
+            berlin_block,
+            london_block,
         }
     }
 }
@@ -131,7 +143,7 @@ impl Genesis {
         let timestamp = 0x0.into();
         let difficulty = 0x1.into();
         let number = 0x0.into();
-        let config = Config::byzantium();
+        let config = Config::london();
         let extra_data = 0.into();
         let mixhash = 0.into();
         let parent_hash = 0.into();
