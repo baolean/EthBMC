@@ -475,6 +475,8 @@ impl Env {
                 &old_env.latest_block().timestamp,
                 &env.latest_block().timestamp,
             ));
+            constraints.push(lt(&env.latest_block().number, &const256(MAX_NUMBER)));
+            constraints.push(lt(&env.latest_block().timestamp, &const256(MAX_TIMESTAMP)));
             constraints.push(eql(
                 &env.latest_block().coinbase,
                 &generate_random_address(),

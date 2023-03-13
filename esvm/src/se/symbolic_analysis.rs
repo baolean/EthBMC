@@ -656,6 +656,8 @@ impl Analysis {
             TxData {
                 balance,
                 input_data,
+                number,
+                timestamp,
             },
         ) in attack_data.iter().enumerate()
         {
@@ -667,6 +669,10 @@ impl Analysis {
                 evm.genesis.timestamp = BitVec::as_bigint(&block.timestamp).unwrap().into();
                 evm.genesis.number = BitVec::as_bigint(&block.number).unwrap().into();
                 evm.genesis.gas_limit = BitVec::as_bigint(&block.gas_limit).unwrap().into();
+            } else {
+                // Set block.number and timestamp based on the conretized values
+                evm.genesis.number = number.clone();
+                evm.genesis.timestamp = timestamp.clone();
             }
 
             let input = EvmInput {
@@ -799,7 +805,10 @@ impl Analysis {
         }
         let res = load_state.get_values_for_array(loads.as_slice())?;
         let balance = load_state.get_value(&load_state.env.get_tx(tx).callvalue)?;
-        tx_data_from_bval_vec(balance, res)
+        let timestamp = load_state.get_value(&load_state.env.latest_block().timestamp)?;
+        let number = load_state.get_value(&load_state.env.latest_block().number)?;
+
+        tx_data_from_bval_vec(balance, number, timestamp, res)
     }
 
     pub fn dump_debug_graph(mut self) {
@@ -885,6 +894,8 @@ impl fmt::Display for Attack {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TxData {
     pub balance: WU256,
+    pub number: WU256,
+    pub timestamp: WU256,
     pub input_data: Vec<Hash>,
 }
 
@@ -899,14 +910,23 @@ fn convert_data_to_bytes(data: Vec<Hash>) -> Bytes {
     vec.into()
 }
 
-fn tx_data_from_bval_vec(balance: BVal, data: Vec<BVal>) -> Option<TxData> {
+fn tx_data_from_bval_vec(
+    balance: BVal,
+    number: BVal,
+    timestamp: BVal,
+    data: Vec<BVal>,
+) -> Option<TxData> {
     let balance = FVal::as_bigint(&balance)?.into();
+    let number = FVal::as_bigint(&number)?.into();
+    let timestamp = FVal::as_bigint(&timestamp)?.into();
     let mut res = Vec::with_capacity(data.len());
     for val in data {
         res.push(FVal::as_bigint(&val)?.into());
     }
     Some(TxData {
         balance,
+        number,
+        timestamp,
         input_data: res,
     })
 }
