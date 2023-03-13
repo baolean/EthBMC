@@ -297,15 +297,15 @@ impl SymbolicGraph {
         let solver_needed_input_sender = self.solver_needed_input.sender.clone();
 
         let main_thread = thread::spawn(move || {
-            let mut counter = 0;
+            // let mut counter = 0;
 
             loop {
                 if let Some(next_state) = unprocessed_states.pop() {
-                    counter += 1;
-                    if counter >= 20_000 {
-                        break;
-                    }
-                    // send expansive transtions to worker threads, this blocks when all worker threads
+                    // counter += 1;
+                    // if counter >= 20_000 {
+                    //     break;
+                    // }
+                    // send expensive transtions to worker threads, this blocks when all worker threads
                     // are used
                     if symbolic_executor::expensive_computation(&next_state) {
                         debug!("Sending expensive computation to thread");
