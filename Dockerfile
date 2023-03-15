@@ -1,9 +1,9 @@
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 
 RUN apt-get update \
-  && apt-get install -y \
+  && DEBIAN_FRONTEND=noninteractive apt-get -y install \
     build-essential cmake \
-    curl wget vim python3.7 python3.7-dev python3-pip \
+    curl wget vim python3 python3-pip \
     git pkg-config libssl-dev software-properties-common \
     zip unzip tar
 
@@ -23,16 +23,13 @@ RUN git clone https://github.com/boolector/boolector \
 
 ENV PATH="${PATH}:/boolector/build/bin"
 
-# (3) z3: takes ~40 minutes to install
-RUN \
-   mkdir -p temp && cd /temp &&\
-   git clone https://github.com/Z3Prover/z3.git &&\
-   cd z3 && \
-   git checkout z3-4.8.13 &&\
-   python scripts/mk_make.py &&\
-   cd build &&\
-   make &&\
-   make install
+# (3) Z3
+RUN wget https://github.com/Z3Prover/z3/releases/download/z3-4.12.1/z3-4.12.1-x64-glibc-2.35.zip \
+    && unzip z3-4.12.1-x64-glibc-2.35.zip \
+    && rm z3-4.12.1-x64-glibc-2.35.zip \
+    && mv z3-4.12.1-x64-glibc-2.35 z3 
+
+ENV PATH=/z3/bin:$PATH
 
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
@@ -42,15 +39,13 @@ RUN rustup override set nightly
 # Install geth, evm
 RUN wget https://gethstore.blob.core.windows.net/builds/geth-alltools-linux-amd64-1.10.4-aa637fd3.tar.gz
 RUN tar -xf geth-alltools-linux-amd64-1.10.4-aa637fd3.tar.gz \
+  && rm geth-alltools-linux-amd64-1.10.4-aa637fd3.tar.gz \
   && cp geth-alltools-linux-amd64-1.10.4-aa637fd3/* /usr/local/bin/
 
 # Install solc through solc-select
-RUN python3.7 -m pip install -U pip
 RUN pip install solc-select \
     && solc-select install 0.8.13 \
     && solc-select use 0.8.13
-
-WORKDIR /app
 
 # Install EthBMC
 RUN git clone https://github.com/baolean/EthBMC.git \
