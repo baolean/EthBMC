@@ -53,4 +53,6 @@ RUN git clone https://github.com/baolean/EthBMC.git \
   && cargo build --release \
   && mkdir queries
 
+ENV PATH=/EthBMC/target/release:$PATH
+
 ENTRYPOINT ["/bin/bash"]
