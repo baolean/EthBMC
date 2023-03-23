@@ -44,8 +44,8 @@ RUN tar -xf geth-alltools-linux-amd64-1.10.4-aa637fd3.tar.gz \
 
 # Install solc through solc-select
 RUN pip install solc-select \
-    && solc-select install 0.8.13 \
-    && solc-select use 0.8.13
+    && solc-select install 0.8.17 \
+    && solc-select use 0.8.17
 
 # Install EthBMC
 RUN git clone https://github.com/baolean/EthBMC.git \

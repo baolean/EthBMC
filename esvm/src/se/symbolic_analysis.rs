@@ -805,11 +805,6 @@ impl Analysis {
                     }
                 }
                 Instruction::Invalid {} => return Some(()),
-                Instruction::SStore { addr, value } => {
-                    if addr == WU256::from(0) && value == WU256::from(256) {
-                        return Some(());
-                    }
-                }
                 _ => (),
             }
         }

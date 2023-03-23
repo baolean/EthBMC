@@ -406,6 +406,8 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
 
         let loaded_returndata =
             FVal::as_bigint(&mload(&s.memory, s.mem, &addr)).unwrap_or_default();
+        let code = FVal::as_bigint(&mload8(&s.memory, s.mem, &add(&addr, &const_usize(35))))
+            .unwrap_or_default();
 
         // Detecting failed asserts in solc >= 0.8 based on returndata
         if loaded_returndata
@@ -414,6 +416,7 @@ pub fn revert(s: &SeState) -> Vec<(SeState, EdgeType)> {
                 "35408467139433450592217433187231851964531694900788300625387963629091585785856",
             )
             .unwrap()
+            && code == FVal::as_bigint(&one()).unwrap_or_default()
         {
             res.failed_assert = true;
         }
