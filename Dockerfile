@@ -55,4 +55,12 @@ RUN git clone https://github.com/baolean/EthBMC.git \
 
 ENV PATH=/EthBMC/target/release:$PATH
 
+# Install Foundry
+RUN curl -L https://foundry.paradigm.xyz | bash
+
+RUN git clone https://github.com/baolean/foundry.git \
+  && cd foundry \
+  && git checkout symexec \
+  && /root/.foundry/bin/foundryup --path .
+
 ENTRYPOINT ["/bin/bash"]
