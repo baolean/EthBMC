@@ -543,8 +543,8 @@ impl SeState {
         Arc::make_mut(&mut self.last_addrs).push_back(Arc::clone(val));
         Arc::make_mut(&mut self.addrs_counter).insert(Arc::clone(val), 0);
 
-        // track last 10 addresses
-        if self.last_addrs.len() > 10 {
+        // track last 30 addresses
+        if self.last_addrs.len() > 30 {
             let key = Arc::make_mut(&mut self.last_addrs).pop_front().unwrap();
             Arc::make_mut(&mut self.addrs_counter).remove(&key);
         }
