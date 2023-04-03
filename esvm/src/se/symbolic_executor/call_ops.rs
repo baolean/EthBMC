@@ -1,15 +1,20 @@
 use std::sync::Arc;
 
-use crate::se::{
-    config::HIJACK_ADDR,
-    env::{AccountId, TxId},
-    expr::{
-        bval::*,
-        symbolic_memory::{memcopy, memset},
+use uint::U256;
+
+use crate::{
+    env::parse_hex_string,
+    se::{
+        config::HIJACK_ADDR,
+        env::{AccountId, TxId},
+        expr::{
+            bval::*,
+            symbolic_memory::{memcopy, memset},
+        },
+        symbolic_analysis::{Analysis, AnalysisMode},
+        symbolic_edge::*,
+        symbolic_state::{Flags, HaltingReason, ResultState, SeState},
     },
-    symbolic_analysis::{Analysis, AnalysisMode},
-    symbolic_edge::*,
-    symbolic_state::{Flags, HaltingReason, ResultState, SeState},
 };
 
 pub fn create_account(s: &SeState) -> Vec<(SeState, EdgeType)> {
@@ -213,9 +218,45 @@ pub fn new_call(s: &SeState, call_type: CallType) -> Vec<(SeState, EdgeType)> {
                 CallType::DelegateCall => TxType::DelegateCall,
             };
 
+            let mut is_hevm: bool = false;
+            let mut is_assume: bool = false;
+
+            if *to
+                == const_u256(
+                    U256::from_dec_str("645326474426547203313410069153905908525362434349").unwrap(),
+                )
+            {
+                is_hevm = true;
+            }
+
             // Create a new transaction for the real call
             let tx = create_new_outgoing(&mut call, gas, in_size, out_size, in_off, value, tx_type);
 
+            let load = mload(&call.memory, call.mem, in_off);
+            let shiftval = const_u256(U256::from(224));
+            let shiftop = lshr(&load, &shiftval);
+
+            if FVal::simplified(&shiftop) == const_u256(U256::from_dec_str("1281615202").unwrap()) {
+                is_assume = true;
+            }
+
+            // vm.assume
+            if is_hevm && is_assume {
+                // 128 + 4 == 132
+                let args = add(in_off, &const_usize(4)); // &const_usize(132)
+                let load_args = mload(&call.memory, call.mem, &args);
+                call.push_constraint(load_args);
+
+                let callres = fresh_var(&format!(
+                    "call_{}_to_{}_assume",
+                    call.account().name,
+                    call.env.get_account(&id).name
+                ));
+                call.push_constraint(eql(&callres, &one()));
+                call.stack.push(callres);
+
+                trans.push((call, edge_call_ret()));
+            } else
             // on normal calls just simulate value transfer
             if (call_type.is_static_call() || call_type.is_call())
                 && call.env.get_account(&id).code().is_none()

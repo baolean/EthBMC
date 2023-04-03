@@ -124,7 +124,7 @@ fn parse_yaml_value(val: &Yaml) -> BVal {
     }
 }
 
-fn parse_hex_string(s: &String) -> BVal {
+pub fn parse_hex_string(s: &String) -> BVal {
     if s.starts_with("0x") {
         const_vec(&hexdecode::decode(&s[2..].as_bytes()).unwrap())
     } else {
@@ -235,6 +235,23 @@ impl SeEnviroment {
                 victim = id;
             }
         }
+
+        let hevm_bin = "6080604052348015600f57600080fd5b506004361060285760003560e01c80634c63e56214602d575b600080fd5b60436004803603810190603f91906080565b6045565b005b50565b600080fd5b60008115159050919050565b606081604d565b8114606a57600080fd5b50565b600081359050607a816059565b92915050565b60006020828403121560935760926048565b5b6000609f84828501606d565b9150509291505056fea2646970667358221220424923d605678870dd0c92e1b477333075bb265e46c7f602b587b8373544355e64736f6c63430008110033";
+        let hevm_code = hexdecode::decode(hevm_bin.as_bytes()).unwrap();
+        let hevm_id = env.new_account(
+            &mut memory,
+            "hevm",
+            &const_vec(
+                &hexdecode::decode("0x7109709ecfa91a80626ff3989d68f67f5b1dd12d".as_bytes())
+                    .unwrap(),
+            ),
+            Some(hevm_code),
+            &const_usize(0 as usize),
+        );
+
+        let mut loaded_accounts = env.loaded_accounts.unwrap_or_else(Vec::new);
+        loaded_accounts.push(hevm_id);
+        env.loaded_accounts = Some(loaded_accounts);
 
         let memory = Arc::new(memory);
 
