@@ -124,6 +124,14 @@ fn parse_yaml_value(val: &Yaml) -> BVal {
     }
 }
 
+fn parse_hex_string(s: &String) -> BVal {
+    if s.starts_with("0x") {
+        const_vec(&hexdecode::decode(&s[2..].as_bytes()).unwrap())
+    } else {
+        const_vec(&hexdecode::decode(&s.as_bytes()).unwrap())
+    }
+}
+
 impl SeEnviroment {
     pub fn from_chain(addr: &str) -> Option<Self> {
         if CONFIG.read().unwrap().parity.is_none() {
@@ -159,6 +167,83 @@ impl SeEnviroment {
             to: victim,
             memory,
         })
+    }
+
+    // Setting up initial state from Foundry's compilation info
+    pub fn from_forge(
+        analyzed_address: String,
+        signature: String,
+        storage_info: HashMap<String, (String, HashMap<String, String>)>,
+    ) -> Self {
+        let mut env = Env::new();
+        let mut memory = symbolic_memory::new_memory();
+        let attacker = env.new_attacker_account(&mut memory);
+        let _hijack = env.new_hijack_account(&mut memory);
+        let mut victim = AccountId(0);
+        let mut id;
+
+        let victim_addr = const_vec(&hexdecode::decode(analyzed_address.as_bytes()).unwrap());
+
+        env.func_selector = Some(signature);
+
+        for (addr, info) in storage_info {
+            let account_addr = const_vec(&hexdecode::decode(addr.as_bytes()).unwrap());
+            // TODO: configure the balance
+            let account_balance = const_usize(1000 as usize);
+
+            let name = if account_addr == victim_addr {
+                "victim"
+            } else {
+                "other"
+            };
+
+            let code = hexdecode::decode(info.0.as_bytes()).unwrap();
+
+            id = env.new_account(
+                &mut memory,
+                &name,
+                &account_addr,
+                Some(code),
+                &account_balance,
+            );
+
+            let mut initial_storage = Vec::new();
+            let mut account = env.get_account_mut(&id);
+            for (addr, val) in info.1 {
+                let addr = parse_hex_string(&addr);
+                let val = parse_hex_string(&val);
+
+                initial_storage.push((
+                    BitVec::as_bigint(&addr).unwrap().into(),
+                    BitVec::as_bigint(&val).unwrap().into(),
+                ));
+
+                account.storage = word_write(&mut memory, account.storage, &addr, &val);
+            }
+
+            account.initial_storage = Some(initial_storage);
+
+            env.get_account_mut(&id).initial_balance =
+                Some(BitVec::as_bigint(&account_balance).unwrap().into());
+
+            // save id
+            let mut loaded_accounts = env.loaded_accounts.unwrap_or_else(Vec::new);
+            loaded_accounts.push(id);
+            env.loaded_accounts = Some(loaded_accounts);
+
+            if account_addr == victim_addr {
+                victim = id;
+            }
+        }
+
+        let memory = Arc::new(memory);
+
+        SeEnviroment {
+            env,
+            from: attacker,
+            to: victim,
+            memory,
+        }
     }
 
     pub fn from_yaml(yaml: &Yaml) -> Self {
@@ -320,6 +405,9 @@ pub struct Env {
 
     addresses: HashMap<BVal, AccountId>,
 
+    /// Selector of a function to be analyzed
+    pub func_selector: Option<String>,
+
     /// Transactions present in the enviroment
     transactions: HashMap<TxId, Transaction>,
     tx_counter: usize,
@@ -343,6 +431,8 @@ impl Env {
         let accounts = HashMap::new();
         let acc_counter = 0;
 
+        let func_selector = None;
+
         let transactions = HashMap::new();
         let tx_counter = 0;
         let block = Block::new();
@@ -363,6 +453,7 @@ impl Env {
             accounts,
             transactions,
             acc_counter,
+            func_selector,
             tx_counter,
             addresses,
             constraints,
@@ -839,6 +930,10 @@ impl Env {
 
     pub fn get_tx_mut(&mut self, id: &TxId) -> &mut Transaction {
         self.transactions.get_mut(id).unwrap()
+    }
+
+    pub fn get_selector(&self) -> &Option<String> {
+        &self.func_selector
     }
 }
 
