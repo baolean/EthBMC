@@ -537,85 +537,83 @@ impl Analysis {
             }
             _ => {
                 // TODO(baolean): identify DSTest/forge-test assert failures
-                /*
-                    if potential_attack_state.env.func_selectors.is_some() {
-                        let mut check = potential_attack_state.clone();
-                        // Identifies failed `assertEq`, `assertTrue`, etc.
-                        let failed_val = byte_at(
-                            &sload(&check.memory, check.account().storage, &const_usize(7)),
-                            &one(),
-                        );
+                if potential_attack_state.env.func_selector.is_some() {
+                    let mut check = potential_attack_state.clone();
+                    // Identifies failed `assertEq`, `assertTrue`, etc.
+                    let failed_val = byte_at(
+                        &sload(&check.memory, check.account().storage, &const_usize(0)),
+                        &one(),
+                    );
 
-                        check.push_constraint(eql(&failed_val, &one()));
-                        if check.check_sat() {
-                            info!("Foundry's assert might be violated!");
+                    check.push_constraint(eql(&failed_val, &one()));
+                    if check.check_sat() {
+                        info!("Foundry's assert might be violated!");
 
-                            if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
-                                if self
-                                    .verify_tx_forge_test(&potential_attack_state, &data)
-                                    .is_some()
-                                {
-                                    // TODO(baolean): refactor the code duplication
-                                    let mut attack_counterexample: Vec<ForgeInput> = vec![];
+                        if let Some(data) = self.generate_tx_datas(&potential_attack_state) {
+                            if self
+                                .verify_tx_forge_test(&potential_attack_state, &data)
+                                .is_some()
+                            {
+                                // TODO(baolean): refactor the code duplication
+                                let mut attack_counterexample: Vec<ForgeInput> = vec![];
 
-                                    let sender: Address = BitVec::as_bigint(
-                                        &potential_attack_state.env.get_account(&self.from).addr,
-                                    )
-                                    .unwrap()
-                                    .into();
-                                    let receiver: Address = BitVec::as_bigint(
-                                        &potential_attack_state.env.get_account(&self.to).addr,
-                                    )
-                                    .unwrap()
-                                    .into();
+                                let sender: Address = BitVec::as_bigint(
+                                    &potential_attack_state.env.get_account(&self.from).addr,
+                                )
+                                .unwrap()
+                                .into();
+                                let receiver: Address = BitVec::as_bigint(
+                                    &potential_attack_state.env.get_account(&self.to).addr,
+                                )
+                                .unwrap()
+                                .into();
 
-                                    if potential_attack_state.config().symbolic_storage {
-                                        println!("\nConcretized storage:");
-                                        for upd in data[0].storage_upd.iter() {
-                                            println!(
-                                                "Account: {:#x} \n {:#x}: {:#x}",
-                                                upd.account, upd.addr, upd.value
-                                            );
-                                        }
+                                if potential_attack_state.config().symbolic_storage {
+                                    println!("\nConcretized storage:");
+                                    for upd in data[0].storage_upd.iter() {
+                                        println!(
+                                            "Account: {:#x} \n {:#x}: {:#x}",
+                                            upd.account, upd.addr, upd.value
+                                        );
                                     }
-
-                                    for TxData {
-                                        balance: _,
-                                        number: _,
-                                        timestamp: _,
-                                        input_data,
-                                        storage_upd: _,
-                                    } in data.iter()
-                                    {
-                                        // Converting sender and receiver's WU256 to a hex string for compatibility
-                                        let tx_sender: String = format!("{:x}", sender.clone());
-                                        let tx_receiver: String = format!("{:x}", receiver.clone());
-
-                                        let input = ForgeInput {
-                                            input_data: convert_data_to_bytes(input_data.clone())
-                                                .to_hex(),
-                                            sender: tx_sender,
-                                            receiver: tx_receiver,
-                                        };
-                                        attack_counterexample.push(input);
-                                    }
-
-                                    let attack = Attack {
-                                        txs: data,
-                                        attack_type: AttackType::AssertFailed,
-                                        counterexamples: Some(attack_counterexample),
-                                    };
-                                    result.lock().unwrap().push(attack);
-                                } else {
-                                    println!(
-                                        "Found attack, {}, but could not generate tx data!",
-                                        AttackType::AssertFailed
-                                    );
                                 }
+
+                                for TxData {
+                                    balance: _,
+                                    number: _,
+                                    timestamp: _,
+                                    input_data,
+                                    storage_upd: _,
+                                } in data.iter()
+                                {
+                                    // Converting sender and receiver's WU256 to a hex string for compatibility
+                                    let tx_sender: String = format!("{:x}", sender.clone());
+                                    let tx_receiver: String = format!("{:x}", receiver.clone());
+
+                                    let input = ForgeInput {
+                                        input_data: convert_data_to_bytes(input_data.clone())
+                                            .to_hex(),
+                                        sender: tx_sender,
+                                        receiver: tx_receiver,
+                                    };
+                                    attack_counterexample.push(input);
+                                }
+
+                                let attack = Attack {
+                                    txs: data,
+                                    attack_type: AttackType::AssertFailed,
+                                    counterexamples: Some(attack_counterexample),
+                                };
+                                result.lock().unwrap().push(attack);
+                            } else {
+                                println!(
+                                    "Found attack, {}, but could not generate tx data!",
+                                    AttackType::AssertFailed
+                                );
                             }
                         }
                     }
-                } */
+                }
             }
         };
 
@@ -909,8 +907,8 @@ impl Analysis {
 
         if evm.genesis.alloc[&test_contract]
             .storage
-            // `_failed` variable in forge-std tests is at slot 7, offset 1
-            .get(&WU256::from(7))
+            // `_failed` variable in forge-std tests is at slot 0, offset 1
+            .get(&WU256::from(0))
             .unwrap()
             .0
             .byte(1)
