@@ -767,12 +767,9 @@ impl Analysis {
                     let shiftval = const_u256(U256::from(224));
                     let shiftop = lshr(&load, &shiftval);
                     let prove_constraint = eql(&prove_selector, &shiftop);
-                    constraints.push(prove_constraint);
-                    // The calldata's selector should be pointing to either of the "prove_xxx" functions
-                    let constraint = constraints
-                        .iter()
-                        .fold(const_u256(U256::from(0)), |acc, x| or(&acc, &x));
-                    new_state.push_constraint(constraint);
+                    // The calldata's selector should be pointing to the "prove_xxx" function
+                    // Adding the constraint to the state
+                    new_state.push_constraint(prove_constraint);
                 }
                 new_state
             }

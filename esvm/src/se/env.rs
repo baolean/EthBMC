@@ -236,19 +236,23 @@ impl SeEnviroment {
             }
         }
 
-        let hevm_id = env.new_account(
+        // Using a VM contract mock
+        let vm_bin = "6080604052348015600f57600080fd5b506004361060285760003560e01c80634c63e56214602d575b600080fd5b60436004803603810190603f91906080565b6045565b005b50565b600080fd5b60008115159050919050565b606081604d565b8114606a57600080fd5b50565b600081359050607a816059565b92915050565b60006020828403121560935760926048565b5b6000609f84828501606d565b9150509291505056fea2646970667358221220424923d605678870dd0c92e1b477333075bb265e46c7f602b587b8373544355e64736f6c63430008110033";
+        let vm_code = hexdecode::decode(vm_bin.as_bytes()).unwrap();
+
+        let vm_id = env.new_account(
             &mut memory,
-            "hevm",
+            "vm",
             &const_vec(
                 &hexdecode::decode("0x7109709ecfa91a80626ff3989d68f67f5b1dd12d".as_bytes())
                     .unwrap(),
             ),
-            None,
+            Some(vm_code),
             &const_usize(0 as usize),
         );
 
         let mut loaded_accounts = env.loaded_accounts.unwrap_or_else(Vec::new);
-        loaded_accounts.push(hevm_id);
+        loaded_accounts.push(vm_id);
         env.loaded_accounts = Some(loaded_accounts);
 
         let memory = Arc::new(memory);
@@ -1203,21 +1207,20 @@ impl Into<genesis::Genesis> for Env {
             );
         }
 
-        // Setting up an hevm cheatcode contract mock
-        let hevm_bin = "6080604052348015600f57600080fd5b506004361060285760003560e01c80634c63e56214602d575b600080fd5b60436004803603810190603f91906080565b6045565b005b50565b600080fd5b60008115159050919050565b606081604d565b8114606a57600080fd5b50565b600081359050607a816059565b92915050565b60006020828403121560935760926048565b5b6000609f84828501606d565b9150509291505056fea2646970667358221220424923d605678870dd0c92e1b477333075bb265e46c7f602b587b8373544355e64736f6c63430008110033";
-        let hevm_code = Some(hexdecode::decode(hevm_bin.as_bytes()).unwrap());
-        let hevm_addr = &const_vec(
-            &hexdecode::decode("0x7109709ecfa91a80626ff3989d68f67f5b1dd12d".as_bytes()).unwrap(),
-        );
+        // Setting up a VM cheatcode contract mock for concrete validation
+        let vm_bin = "6080604052348015600f57600080fd5b506004361060285760003560e01c80634c63e56214602d575b600080fd5b60436004803603810190603f91906080565b6045565b005b50565b600080fd5b60008115159050919050565b606081604d565b8114606a57600080fd5b50565b600081359050607a816059565b92915050565b60006020828403121560935760926048565b5b6000609f84828501606d565b9150509291505056fea2646970667358221220424923d605678870dd0c92e1b477333075bb265e46c7f602b587b8373544355e64736f6c63430008110033";
+        let vm_code = Some(hexdecode::decode(vm_bin.as_bytes()).unwrap());
+        let vm_addr =
+            &parse_hex_string(&String::from("0x7109709ecfa91a80626ff3989d68f67f5b1dd12d"));
 
-        let hevm_acc = genesis::Account::new(
+        let vm_acc = genesis::Account::new(
             10_000_000_000_000_000_000u64.into(),
-            hevm_code.map(|c| c.into()),
+            vm_code.map(|c| c.into()),
             0.into(),
             Some(HashMap::new()),
         );
 
-        g.add_account(BitVec::as_bigint(&hevm_addr).unwrap().into(), hevm_acc);
+        g.add_account(BitVec::as_bigint(&vm_addr).unwrap().into(), vm_acc);
 
         g
     }

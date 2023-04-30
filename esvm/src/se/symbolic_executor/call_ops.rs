@@ -218,15 +218,13 @@ pub fn new_call(s: &SeState, call_type: CallType) -> Vec<(SeState, EdgeType)> {
                 CallType::DelegateCall => TxType::DelegateCall,
             };
 
-            let mut is_hevm: bool = false;
+            let mut is_vm: bool = false;
             let mut is_assume: bool = false;
 
-            if *to
-                == const_u256(
-                    U256::from_dec_str("645326474426547203313410069153905908525362434349").unwrap(),
-                )
+            // VM contract
+            if *to == parse_hex_string(&String::from("0x7109709ecfa91a80626ff3989d68f67f5b1dd12d"))
             {
-                is_hevm = true;
+                is_vm = true;
             }
 
             // Create a new transaction for the real call
@@ -236,12 +234,13 @@ pub fn new_call(s: &SeState, call_type: CallType) -> Vec<(SeState, EdgeType)> {
             let shiftval = const_u256(U256::from(224));
             let shiftop = lshr(&load, &shiftval);
 
-            if FVal::simplified(&shiftop) == const_u256(U256::from_dec_str("1281615202").unwrap()) {
+            // `vm.assume(bool)`
+            if FVal::simplified(&shiftop) == parse_hex_string(&String::from("0x4C63E562")) {
                 is_assume = true;
             }
 
             // vm.assume
-            if is_hevm && is_assume {
+            if is_vm && is_assume {
                 // 128 + 4 == 132
                 let args = add(in_off, &const_usize(4)); // &const_usize(132)
                 let load_args = mload(&call.memory, call.mem, &args);
