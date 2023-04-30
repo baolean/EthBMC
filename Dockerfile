@@ -50,6 +50,7 @@ RUN pip install solc-select \
 # Install EthBMC
 RUN git clone https://github.com/baolean/EthBMC.git \
   && cd EthBMC \
+  && git checkout forge \
   && cargo build --release \
   && mkdir queries
 
